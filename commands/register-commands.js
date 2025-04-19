@@ -1,4 +1,10 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: join(__dirname, '../.env') });
+
 import { DiscordRequest } from '../util/discord-request.js';
 import { CHALLENGE_COMMAND } from './challenge.command.js';
 import { TEST_COMMAND } from './test.command.js';
@@ -18,5 +24,7 @@ export async function RegisterGlobalCommands(appId, commands) {
 }
 
 const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND];
+
+console.log('APP_ID: ', process.env.APP_ID);
 
 RegisterGlobalCommands(process.env.APP_ID, ALL_COMMANDS);

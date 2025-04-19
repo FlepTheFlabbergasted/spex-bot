@@ -1,3 +1,10 @@
+import dotenv from 'dotenv';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: join(__dirname, '../.env') });
+
 import { InteractionResponseFlags, InteractionResponseType, MessageComponentTypes } from 'discord-interactions';
 import { getResult, getShuffledOptions } from '../commands/challenge.command.js';
 import { DiscordRequest } from '../util/discord-request.js';
