@@ -12,10 +12,10 @@
   },
   "license": "ISC",
   "author": "FlepTheFlabbergasted",
-  "main": "src/index.js",
+  "main": "functions/index.js",
   "type": "module",
   "engines": {
-    "node": ">=20.x"
+    "node": "22"
   },
   "scripts": {
     "start": "node src/index.js",

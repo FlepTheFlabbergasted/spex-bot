@@ -1,19 +1,54 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * const {onCall} = require("firebase-functions/v2/https");
- * const {onDocumentWritten} = require("firebase-functions/v2/firestore");
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
+import 'dotenv/config';
 
-const {onRequest} = require("firebase-functions/v2/https");
-const logger = require("firebase-functions/logger");
+import { InteractionResponseType, InteractionType, verifyKeyMiddleware } from 'discord-interactions';
+import express from 'express';
+import { initializeApp } from 'firebase-admin/app';
+import { setGlobalOptions } from 'firebase-functions';
+import { onRequest } from 'firebase-functions/https';
+import { handleCommands } from '../src/handle-commands.js';
+import { handleInteractions } from '../src/handle-interactions.js';
 
 // Create and deploy your first functions
 // https://firebase.google.com/docs/functions/get-started
 
-// exports.helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
+initializeApp();
+setGlobalOptions({ region: 'europe-west3' });
+
+// To keep track of our active games
+const activeGames = {};
+
+const app = express();
+
+console.log('process.env.PUBLIC_KEY: ', process.env.PUBLIC_KEY);
+
+// Apply JSON parsing and signature verification
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
+app.use(verifyKeyMiddleware(process.env.PUBLIC_KEY));
+
+/**
+ * Interactions endpoint URL where Discord will send HTTP requests
+ * Parse request body and verifies incoming requests using discord-interactions package
+ */
+app.post('/', (req, res) => {
+  const { type } = req.body;
+
+  switch (type) {
+    case InteractionType.PING:
+      return res.send({ type: InteractionResponseType.PONG });
+    case InteractionType.APPLICATION_COMMAND:
+      return handleCommands(req, res, activeGames);
+    case InteractionType.MESSAGE_COMPONENT:
+      return handleInteractions(req, res, activeGames);
+    default:
+      console.error('unknown interaction type', type);
+      return res.status(400).json({ error: 'unknown interaction type' });
+  }
+});
+
+export const discord = onRequest(app);
