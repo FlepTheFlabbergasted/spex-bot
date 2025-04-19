@@ -1,6 +1,5 @@
-import 'dotenv/config';
-
 import { InteractionResponseType, InteractionType, verifyKeyMiddleware } from 'discord-interactions';
+import 'dotenv/config';
 import express from 'express';
 import { initializeApp } from 'firebase-admin/app';
 import { setGlobalOptions } from 'firebase-functions';
@@ -21,15 +20,7 @@ const app = express();
 
 console.log('process.env.PUBLIC_KEY: ', process.env.PUBLIC_KEY);
 
-// Apply JSON parsing and signature verification
-app.use(
-  express.json({
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
-    },
-  })
-);
-app.use(verifyKeyMiddleware(process.env.PUBLIC_KEY));
+// app.use(verifyKeyMiddleware(process.env.PUBLIC_KEY));
 
 /**
  * Interactions endpoint URL where Discord will send HTTP requests
@@ -37,6 +28,8 @@ app.use(verifyKeyMiddleware(process.env.PUBLIC_KEY));
  */
 app.post('/', (req, res) => {
   const { type } = req.body;
+
+  verifyKeyMiddleware(process.env.PUBLIC_KEY);
 
   switch (type) {
     case InteractionType.PING:
