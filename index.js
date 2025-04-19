@@ -1,25 +1,30 @@
 import { InteractionResponseType, InteractionType, verifyKeyMiddleware } from 'discord-interactions';
 import 'dotenv/config';
-import express from 'express';
-import { handleCommands } from './handle-commands.js';
-import { handleInteractions } from './handle-interactions.js';
+import { initializeApp } from 'firebase-admin/app';
+import { setGlobalOptions } from 'firebase-functions';
+import { onRequest } from 'firebase-functions/https';
+import { handleCommands } from './handlers/commands.handler.js';
+import { handleInteractions } from './handlers/interactions.handler.js';
 
-// Create an express app
-const app = express();
-// Get port, or default to 3000
-const PORT = process.env.PORT || 3000;
+initializeApp();
+setGlobalOptions({ region: 'europe-west3' });
+
 // To keep track of our active games
 const activeGames = {};
+
+console.log('process.env.PUBLIC_KEY: ', process.env.PUBLIC_KEY);
 
 /**
  * Interactions endpoint URL where Discord will send HTTP requests
  * Parse request body and verifies incoming requests using discord-interactions package
  */
-app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async function (req, res) {
+export const discord = onRequest(async (req, res) => {
+  // Use discord-interactions to verify the request
+  verifyKeyMiddleware(process.env.PUBLIC_KEY);
+
   const { type } = req.body;
 
   switch (type) {
-    // Handle verification requests
     case InteractionType.PING:
       return res.send({ type: InteractionResponseType.PONG });
     case InteractionType.APPLICATION_COMMAND:
@@ -30,8 +35,4 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
       console.error('unknown interaction type', type);
       return res.status(400).json({ error: 'unknown interaction type' });
   }
-});
-
-app.listen(PORT, () => {
-  console.log('Listening on port', PORT);
 });
