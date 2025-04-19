@@ -8,6 +8,7 @@ dotenv.config({ path: join(__dirname, '../.env') });
 import { DiscordRequest } from '../util/discord-request.js';
 import { CHALLENGE_COMMAND } from './challenge.command.js';
 import { TEST_COMMAND } from './test.command.js';
+
 /**
  * To be run with package script `npm run register`
  */

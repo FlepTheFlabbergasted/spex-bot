@@ -6,13 +6,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(__dirname, '../.env') });
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+const DISCORD_ROOT_API_URL = 'https://discord.com/api/v10/';
 
 export async function DiscordRequest(endpoint, options) {
-  // append endpoint to root API URL
-  const url = 'https://discord.com/api/v10/' + endpoint;
+  const url = DISCORD_ROOT_API_URL + endpoint;
 
   // Stringify payloads
-  if (options.body) options.body = JSON.stringify(options.body);
+  if (options.body) {
+    options.body = JSON.stringify(options.body);
+  }
+
   // Use fetch to make requests
   const res = await fetch(url, {
     headers: {
@@ -32,4 +35,19 @@ export async function DiscordRequest(endpoint, options) {
 
   // return original response
   return res;
+}
+
+export async function getUserRoles({ guildId, userId }) {
+  const response = await DiscordRequest(`guilds/${guildId}/members/${userId}`, { method: 'GET' });
+  const member = await response.json();
+
+  // Array of role IDs
+  return member.roles;
+}
+
+export async function getRoles({ guildId }) {
+  const response = await DiscordRequest(`guilds/${guildId}/roles`, { method: 'GET' });
+  const roles = await response.json();
+
+  return roles;
 }
