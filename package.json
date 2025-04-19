@@ -18,6 +18,7 @@
     "node": "22"
   },
   "scripts": {
+    "preserve": "npm run register",
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "predeploy": "npm run register",
