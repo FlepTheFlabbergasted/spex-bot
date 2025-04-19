@@ -1,9 +1,12 @@
-import { DiscordRequest } from '../util/discord-request';
+import { InteractionResponseFlags, InteractionResponseType, MessageComponentTypes } from 'discord-interactions';
+import { getResult, getShuffledOptions } from '../commands/challenge.command.js';
+import { DiscordRequest } from '../util/discord-request.js';
+import { getRandomEmoji } from '../util/get-random-emoji.js';
 
 /**
  * Handle requests from interactive components
  */
-export async function handleInteractions(req, res) {
+export async function handleInteractions(req, res, activeGames) {
   // custom_id set in payload when sending message component
   const componentId = req.body.data.custom_id;
 
@@ -52,7 +55,7 @@ export async function handleInteractions(req, res) {
       const userId = context === 0 ? req.body.member.user.id : req.body.user.id;
 
       // User's object choice
-      const objectName = data.values[0];
+      const objectName = req.body.data.values[0];
 
       // Calculate result from helper function
       const resultStr = getResult(activeGames[gameId], {

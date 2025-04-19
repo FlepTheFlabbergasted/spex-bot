@@ -23,9 +23,9 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
     case InteractionType.PING:
       return res.send({ type: InteractionResponseType.PONG });
     case InteractionType.APPLICATION_COMMAND:
-      return handleCommands(req, res);
+      return handleCommands(req, res, activeGames);
     case InteractionType.MESSAGE_COMPONENT:
-      return handleInteractions(req, res);
+      return handleInteractions(req, res, activeGames);
     default:
       console.error('unknown interaction type', type);
       return res.status(400).json({ error: 'unknown interaction type' });
