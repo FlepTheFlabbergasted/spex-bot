@@ -1,0 +1,38 @@
+{
+  "name": "spex-bot",
+  "version": "1.0.0",
+  "description": "Discord bot for Umespexarna",
+  "homepage": "https://github.com/FlepTheFlabbergasted/spex-bot#readme",
+  "bugs": {
+    "url": "https://github.com/FlepTheFlabbergasted/spex-bot/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FlepTheFlabbergasted/spex-bot.git"
+  },
+  "license": "ISC",
+  "author": "FlepTheFlabbergasted",
+  "main": "index.js",
+  "type": "module",
+  "engines": {
+    "node": ">=20.x"
+  },
+  "scripts": {
+    "start": "node app.js",
+    "register": "node commands.js",
+    "dev": "nodemon app.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.24.0",
+    "eslint": "^9.24.0",
+    "eslint-config-prettier": "^10.1.2",
+    "eslint-plugin-prettier": "^5.2.6",
+    "nodemon": "^3.1.9",
+    "prettier": "^3.5.3"
+  },
+  "dependencies": {
+    "discord-interactions": "^4.1.1",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0"
+  }
+}
