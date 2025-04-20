@@ -1,5 +1,5 @@
 runtime: nodejs
-env: flex
+env: standard
 entrypoint: node index.js
 
 runtime_config:
