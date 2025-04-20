@@ -2,19 +2,19 @@ import { REST, Routes } from 'discord.js';
 import dotenv from 'dotenv';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ALL_COMMANDS } from '../index.js';
+import { ALL_COMMANDS, PROD_COMMANDS } from '../index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(__dirname, '../../.env') });
 
 const APP_ID = process.env.APP_ID;
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
-const GUILD_DEV_ID = process.env.GUILD_DEV_ID;
+const GUILD_DEV_ID = process.env.GUILD_DEV_ID; // Note, using dev guild id here, need to manually replace if other server
 const NODE_ENV = process.env.NODE_ENV;
 
 const commandData = [];
 
-for (const command of ALL_COMMANDS) {
+for (const command of NODE_ENV === 'prod' ? PROD_COMMANDS : ALL_COMMANDS) {
   if ('data' in command && 'execute' in command) {
     commandData.push(command.data.toJSON());
   } else {
