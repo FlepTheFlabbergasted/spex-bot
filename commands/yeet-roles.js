@@ -1,5 +1,4 @@
 import { InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
-import promises from 'node:timers/promises';
 import '../util/array.prototypes.js';
 
 /**
@@ -52,7 +51,6 @@ export const COMMAND_YEET_ROLES = {
      * @see https://discordjs.guide/slash-commands/response-methods.html#deferred-responses
      */
     await interaction.deferReply();
-    await promises.setTimeout(4_000);
 
     let membersWithRemovedRoles = [];
     guildMemberCollection.forEach((member) => {
