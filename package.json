@@ -19,11 +19,14 @@
   },
   "scripts": {
     "start": "node index.js",
-    "register": "node commands/util/register-commands.js"
+    "register:dev": "cross-env GUILD_DEV_ID=369422543712550912 node commands/util/register-commands.js",
+    "register:prod": "cross-env GUILD_DEV_ID=369422543712550912 NODE_ENV=prod node commands/util/register-commands.js",
+    "deploy": "gcloud app deploy --project=spex-bot"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
     "@eslint/json": "^0.12.0",
+    "cross-env": "^7.0.3",
     "eslint": "^9.25.0",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-import": "^2.31.0",
