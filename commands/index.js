@@ -1,4 +1,4 @@
 import { COMMAND_PING } from './ping.js';
-import { COMMAND_TEST } from './test.js';
+import { COMMAND_YEET_ROLES } from './yeet-roles.js';
 
-export const ALL_COMMANDS = [COMMAND_PING, COMMAND_TEST];
+export const ALL_COMMANDS = [COMMAND_PING, COMMAND_YEET_ROLES];
