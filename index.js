@@ -1,50 +1,42 @@
+import { Client, Events, GatewayIntentBits, MessageFlags } from 'discord.js';
 import 'dotenv/config';
+import { getCommandCollection } from './commands/util/get-command-collection.js';
 
-import { InteractionResponseType, InteractionType, verifyKey } from 'discord-interactions';
-import { initializeApp } from 'firebase-admin/app';
-import { setGlobalOptions } from 'firebase-functions';
-import { onRequest } from 'firebase-functions/https';
-import { handleCommands } from './handlers/commands.handler.js';
-import { handleInteractions } from './handlers/interactions.handler.js';
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 
-initializeApp();
-setGlobalOptions({ region: 'europe-west3' });
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+client.commands = getCommandCollection();
 
-// To keep track of our active games
-const activeGames = {};
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
 
-const PUBLIC_KEY = process.env.PUBLIC_KEY;
-console.log('PUBLIC_KEY: ', PUBLIC_KEY);
+  const command = interaction.client.commands.get(interaction.commandName);
 
-/**
- * Interactions endpoint URL where Discord will send HTTP requests
- * Parse request body and verifies incoming requests using discord-interactions package
- */
-export const discord = onRequest(async (req, res) => {
-  // Verify the interaction request using discord-interactions
-  const isVerified = await verifyKey(
-    req.rawBody,
-    req.headers['x-signature-ed25519'],
-    req.headers['x-signature-timestamp'],
-    PUBLIC_KEY
-  );
-
-  if (!isVerified) {
-    console.error('Invalid request signature');
-    return res.status(400).send('Invalid request signature');
+  if (!command) {
+    console.error(`No command matching ${interaction.commandName} was found.`);
+    return;
   }
 
-  const { type } = req.body;
-
-  switch (type) {
-    case InteractionType.PING:
-      return res.send({ type: InteractionResponseType.PONG });
-    case InteractionType.APPLICATION_COMMAND:
-      return handleCommands(req, res, activeGames);
-    case InteractionType.MESSAGE_COMPONENT:
-      return handleInteractions(req, res, activeGames);
-    default:
-      console.error(`unknown interaction type '${type}'`);
-      return res.status(400).json({ error: `unknown interaction type '${type}'` });
+  try {
+    await command.execute(interaction);
+  } catch (error) {
+    console.error(error);
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp({
+        content: 'There was an error while executing this command!',
+        flags: MessageFlags.Ephemeral,
+      });
+    } else {
+      await interaction.reply({
+        content: 'There was an error while executing this command!',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
   }
 });
+
+client.once(Events.ClientReady, (readyClient) => {
+  console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+});
+
+client.login(DISCORD_TOKEN);
