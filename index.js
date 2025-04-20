@@ -4,7 +4,7 @@ import { getCommandCollection } from './commands/util/get-command-collection.js'
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers] });
 client.commands = getCommandCollection();
 
 client.on(Events.InteractionCreate, async (interaction) => {
