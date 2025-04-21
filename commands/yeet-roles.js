@@ -41,8 +41,8 @@ export const COMMAND_YEET_ROLES = {
     if (unknownRoleNames.length > 0) {
       const reply =
         unknownRoleNames.length === 1
-          ? `🤷‍♀️ Couldn't find a role named "${unknownRoleNames[0]}". No changes made 🚫`
-          : `🤷‍♀️ Couldn't find any roles named ${unknownRoleNames.map((r) => `"${r}"`).joinReplaceLast(', ', 'and')}. No changes made 🚫`;
+          ? `Couldn't find a role named "${unknownRoleNames[0]}" 🤷‍♀️ No changes made 🚫`
+          : `Couldn't find any roles named ${unknownRoleNames.map((r) => `"${r}"`).joinReplaceLast(', ', 'and')} 🤷‍♀️ No changes made 🚫`;
       return await interaction.reply(reply);
     }
 
@@ -53,12 +53,14 @@ export const COMMAND_YEET_ROLES = {
     await interaction.deferReply();
 
     let membersWithRemovedRoles = [];
+    let skippedMembers = [];
     guildMemberCollection.forEach((member) => {
       const memberName = member.displayName ?? member.user.username;
 
       if (member.user.id !== interaction.user.id) {
         if (!member.moderatable) {
           console.log(`Not enough permissions to remove roles from ${memberName}, skipping`);
+          skippedMembers.push(memberName);
           return;
         }
 
@@ -67,8 +69,8 @@ export const COMMAND_YEET_ROLES = {
       }
     });
 
-    return await interaction.editReply(
-      `Yeeted ${rolesToRemove.length > 1 ? 'roles' : 'role'} ${rolesToRemove.map((r) => `"${r.name}"`).joinReplaceLast(', ', 'and')} from ${membersWithRemovedRoles.length} unsuspecting souls ✅`
-    );
+    const removedMembersText = `Yeeted ${rolesToRemove.length > 1 ? 'roles' : 'role'} ${rolesToRemove.map((r) => `"${r.name}"`).joinReplaceLast(', ', 'and')} from ${membersWithRemovedRoles.length} unsuspecting souls ✅`;
+    const skippedMembersText = `Skipped ${skippedMembers.length > 1 ? 'members' : 'member'} ${skippedMembers.joinReplaceLast(', ', 'and')} since I don't have enough permissions to change their roles 💁‍♂️🚧`;
+    return await interaction.editReply(`${removedMembersText}\n${skippedMembersText}`);
   },
 };
