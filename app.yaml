@@ -1,14 +1,7 @@
-runtime: nodejs
+runtime: nodejs22
 env: standard
 entrypoint: node index.js
 
-runtime_config:
-  operating_system: 'ubuntu22'
-  runtime_version: '22'
-
+instance_class: B1
 manual_scaling:
   instances: 1
-resources:
-  cpu: 1
-  memory_gb: 1
-  disk_size_gb: 10
