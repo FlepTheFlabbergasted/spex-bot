@@ -1,9 +1,7 @@
 import { Client, Events, GatewayIntentBits, MessageFlags } from 'discord.js';
 import 'dotenv/config';
-import express from 'express';
 import { getCommandCollection } from './commands/util/get-command-collection.js';
 
-const PORT = parseInt(process.env.PORT) || 8080;
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 
 const client = new Client({
@@ -44,18 +42,3 @@ client.once(Events.ClientReady, (readyClient) => {
 });
 
 client.login(DISCORD_TOKEN);
-
-// -----------------------------------------------
-
-const app = express();
-
-app.get('/', (req, res) => {
-  const name = process.env.NAME || 'World';
-  res.send(`Hello ${name}!`);
-});
-
-app.listen(PORT, () => {
-  console.log(`Listening on port ${PORT}`);
-});
-
-// -----------------------------------------------
