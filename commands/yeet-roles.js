@@ -56,7 +56,10 @@ export const COMMAND_YEET_ROLES = {
     let skippedMembers = [];
     guildMemberCollection.forEach((member) => {
       const memberName = member.displayName ?? member.user.username;
+      console.log(`### ${memberName} ${member.id}`);
+      console.log('member.user.bot: ', member.user.bot);
 
+      // We do not touch the member who is using the command
       if (member.user.id !== interaction.user.id) {
         if (!member.moderatable) {
           console.log(`Not enough permissions to remove roles from ${memberName}, skipping`);
@@ -64,6 +67,7 @@ export const COMMAND_YEET_ROLES = {
           return;
         }
 
+        console.log(`Removing role form ${memberName}`);
         member.roles.remove(rolesToRemove);
         membersWithRemovedRoles.push(memberName);
       }
@@ -71,6 +75,8 @@ export const COMMAND_YEET_ROLES = {
 
     const removedMembersText = `Yeeted ${rolesToRemove.length > 1 ? 'roles' : 'role'} ${rolesToRemove.map((r) => `"${r.name}"`).joinReplaceLast(', ', 'and')} from ${membersWithRemovedRoles.length} unsuspecting souls ✅`;
     const skippedMembersText = `Skipped ${skippedMembers.length > 1 ? 'members' : 'member'} ${skippedMembers.joinReplaceLast(', ', 'and')} since I don't have enough permissions to change their roles 💁‍♂️🚧`;
-    return await interaction.editReply(`${removedMembersText}\n${skippedMembersText}`);
+    return await interaction.editReply(
+      `${removedMembersText}${skippedMembers.length ? `\n${skippedMembersText}` : ''}`
+    );
   },
 };
