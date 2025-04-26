@@ -1,14 +1,16 @@
 import { InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import '../util/array.prototypes.js';
 
+const COMMAND_NAME = 'yeet-roles';
+
 /**
  * Remember to drag thte bot role above all others you intend to remove
  * https://dev.to/terabytetiger/how-roles-cause-missing-permission-errors-in-discordjs-1ji7
  */
 export const COMMAND_YEET_ROLES = {
-  name: 'yeet-roles',
+  name: COMMAND_NAME,
   data: new SlashCommandBuilder()
-    .setName('yeet-roles')
+    .setName(COMMAND_NAME)
     .addStringOption((option) =>
       option
         .setName('roles')
@@ -19,6 +21,8 @@ export const COMMAND_YEET_ROLES = {
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .setContexts(InteractionContextType.Guild),
   execute: async (interaction) => {
+    console.log(`##### ${interaction.member.displayName} called /${COMMAND_NAME}`);
+
     const guildMemberCollection = await interaction.guild.members.fetch();
     const roleCollection = await interaction.guild.roles.fetch();
 
@@ -28,6 +32,11 @@ export const COMMAND_YEET_ROLES = {
       .map((r) => r.trim());
     const rolesToRemove = [];
     const unknownRoleNames = [];
+
+    const roleNamesToRemoveStr = `${roleNamesToRemove.map((r) => `"${r.name}"`).joinReplaceLast(', ', 'and')}`;
+    console.log(
+      `${roleNamesToRemove.length > 1 ? 'Roles' : 'Role'} to remove ${roleNamesToRemove.length > 1 ? 'are' : 'is'} ${roleNamesToRemoveStr}`
+    );
 
     for (const roleName of roleNamesToRemove) {
       const role = roleCollection.find((r) => r.name === roleName);
@@ -43,6 +52,8 @@ export const COMMAND_YEET_ROLES = {
         unknownRoleNames.length === 1
           ? `Couldn't find a role named "${unknownRoleNames[0]}" 🤷‍♀️ No changes made 🚫`
           : `Couldn't find any roles named ${unknownRoleNames.map((r) => `"${r}"`).joinReplaceLast(', ', 'and')} 🤷‍♀️ No changes made 🚫`;
+
+      console.log(reply);
       return await interaction.reply(reply);
     }
 
@@ -58,7 +69,7 @@ export const COMMAND_YEET_ROLES = {
       const memberName = member.displayName ?? member.user.username;
 
       // We do not touch the member who is using the command
-      if (member.user.id !== interaction.user.id) {
+      if (member.user.id === interaction.user.id) {
         return;
       }
 
@@ -73,10 +84,11 @@ export const COMMAND_YEET_ROLES = {
       membersWithRemovedRoles.push(memberName);
     });
 
-    const removedMembersText = `Yeeted ${rolesToRemove.length > 1 ? 'roles' : 'role'} ${rolesToRemove.map((r) => `"${r.name}"`).joinReplaceLast(', ', 'and')} from ${membersWithRemovedRoles.length} unsuspecting souls ✅`;
+    const removedMembersText = `Yeeted ${rolesToRemove.length > 1 ? 'roles' : 'role'} ${roleNamesToRemoveStr} from ${membersWithRemovedRoles.length} unsuspecting souls ✅`;
     const skippedMembersText = `Skipped ${skippedMembers.length > 1 ? 'members' : 'member'} ${skippedMembers.joinReplaceLast(', ', 'and')} since I don't have enough permissions to change their roles 💁‍♂️🚧`;
-    return await interaction.editReply(
-      `${removedMembersText}${skippedMembers.length ? `\n${skippedMembersText}` : ''}`
-    );
+    const replyText = `${removedMembersText}${skippedMembers.length ? `\n${skippedMembersText}` : ''}`;
+
+    console.log(replyText);
+    return await interaction.editReply(replyText);
   },
 };
