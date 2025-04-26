@@ -20,7 +20,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   try {
+    const ranCommandStr = `############# ${interaction.member.displayName} ran command "${interaction.commandName}" ##################`;
+    console.log(`\n${ranCommandStr}`);
+
     await command.execute(interaction);
+
+    console.log(`${Array(ranCommandStr.length).fill('#').join('')}\n`);
   } catch (error) {
     console.error(error);
     if (interaction.replied || interaction.deferred) {

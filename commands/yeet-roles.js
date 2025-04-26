@@ -6,6 +6,9 @@ const COMMAND_NAME = 'yeet-roles';
 /**
  * Remember to drag thte bot role above all others you intend to remove
  * https://dev.to/terabytetiger/how-roles-cause-missing-permission-errors-in-discordjs-1ji7
+ *
+ * Keepalive
+ * https://pm2.keymetrics.io/docs/usage/quick-start/
  */
 export const COMMAND_YEET_ROLES = {
   name: COMMAND_NAME,
@@ -21,7 +24,7 @@ export const COMMAND_YEET_ROLES = {
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .setContexts(InteractionContextType.Guild),
   execute: async (interaction) => {
-    console.log(`##### ${interaction.member.displayName} called /${COMMAND_NAME}`);
+    console.log(`Input roles: ${interaction.options.getString('roles')}\n`);
 
     const guildMemberCollection = await interaction.guild.members.fetch();
     const roleCollection = await interaction.guild.roles.fetch();
@@ -30,13 +33,9 @@ export const COMMAND_YEET_ROLES = {
       .getString('roles')
       .split(',')
       .map((r) => r.trim());
+    const roleNamesToRemoveStr = roleNamesToRemove.map((r) => `"${r}"`).joinReplaceLast(', ', 'and');
     const rolesToRemove = [];
     const unknownRoleNames = [];
-
-    const roleNamesToRemoveStr = `${roleNamesToRemove.map((r) => `"${r.name}"`).joinReplaceLast(', ', 'and')}`;
-    console.log(
-      `${roleNamesToRemove.length > 1 ? 'Roles' : 'Role'} to remove ${roleNamesToRemove.length > 1 ? 'are' : 'is'} ${roleNamesToRemoveStr}`
-    );
 
     for (const roleName of roleNamesToRemove) {
       const role = roleCollection.find((r) => r.name === roleName);
@@ -88,7 +87,7 @@ export const COMMAND_YEET_ROLES = {
     const skippedMembersText = `Skipped ${skippedMembers.length > 1 ? 'members' : 'member'} ${skippedMembers.joinReplaceLast(', ', 'and')} since I don't have enough permissions to change their roles 💁‍♂️🚧`;
     const replyText = `${removedMembersText}${skippedMembers.length ? `\n${skippedMembersText}` : ''}`;
 
-    console.log(replyText);
+    console.log(`\n${replyText}`);
     return await interaction.editReply(replyText);
   },
 };
