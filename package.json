@@ -19,7 +19,7 @@
   },
   "scripts": {
     "start": "node index.js",
-    "start-keepalive": "pm2 start pm2-ecosystem.config.js",
+    "start-keepalive": "pm2 start pm2-ecosystem.config.json",
     "register:dev": "cross-env GUILD_DEV_ID=369422543712550912 node commands/util/register-commands.js",
     "register:prod": "cross-env NODE_ENV=prod node commands/util/register-commands.js",
     "deploy": "gcloud app deploy --project=spex-bot",
