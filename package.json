@@ -19,7 +19,7 @@
   },
   "scripts": {
     "start": "node index.js",
-    "start-keepalive": "pm2 start npm --name 'spex-bot' --cron '0 0 1 */4 *' --restart-delay 5000 --log spex-bot-log.txt --time --watch --ignore-watch='node_modules' -- run start",
+    "start-keepalive": "pm2 start pm2-ecosystem.config.js",
     "register:dev": "cross-env GUILD_DEV_ID=369422543712550912 node commands/util/register-commands.js",
     "register:prod": "cross-env NODE_ENV=prod node commands/util/register-commands.js",
     "deploy": "gcloud app deploy --project=spex-bot",
