@@ -22,7 +22,7 @@ export const COMMAND_YEET_ROLES = {
   name: COMMAND_NAME,
   data: new SlashCommandBuilder()
     .setName(COMMAND_NAME)
-    .setDescription('Removes the roles you select from all members (excluding admins, yourself and bots)')
+    .setDescription('Removes the roles you select from all members (excluding yourself and bots)')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .setContexts(InteractionContextType.Guild),
   /**
@@ -54,12 +54,18 @@ export const COMMAND_YEET_ROLES = {
       const selectedRoleNames = selectedRoleIds.map((roleId) => roleCollection.get(roleId)?.name);
       const selectedRoleNamesStr = selectedRoleNames.map((r) => `*${r}*`).joinReplaceLast(', ', 'and');
 
-      const selectionStr = `You selected ${selectedRoleNames.length > 1 ? 'roles' : 'role'} ${selectedRoleNamesStr} to be removed from members 🙋‍♂️🙋‍♀️\nGoing at it now... 🔪`;
-      const noSelectionStr = 'You did not select any roles in time, bye! 👋';
-      const replyContent = selectedRoleNames.length > 0 ? selectionStr : noSelectionStr;
+      if (selectedRoleNames.length > 0) {
+        const selectionStr = `You selected ${selectedRoleNames.length > 1 ? 'roles' : 'role'} ${selectedRoleNamesStr} to be removed from members 🙋‍♂️🙋‍♀️\nGoing at it now... 🔪`;
 
-      console.log(`${replyContent}\n`);
-      await interaction.editReply({ content: replyContent, components: [] });
+        console.log(`${selectionStr}\n`);
+        await interaction.editReply({ content: selectionStr, components: [] });
+      } else {
+        const noSelectionStr = 'You did not select any roles in time, bye! 👋';
+
+        console.log(`${noSelectionStr}\n`);
+        await interaction.editReply({ content: noSelectionStr, components: [] });
+        return;
+      }
 
       let membersWithRemovedRoles = [];
       let skippedMembers = [];
