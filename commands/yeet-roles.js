@@ -98,9 +98,18 @@ export const COMMAND_YEET_ROLES = {
         }
       });
 
-      const removedMembersText = `Yeeted ${selectedRoleIds.length > 1 ? 'roles' : 'role'} ${selectedRoleNamesStr} from ${membersWithRemovedRoles.length} unsuspecting souls ✅`;
+      const removedRolesText = `Yeeted ${selectedRoleIds.length > 1 ? 'roles' : 'role'} ${selectedRoleNamesStr} from ${membersWithRemovedRoles.length} unsuspecting souls ✅`;
+      const noRolesRemovedText = `I didn't manage to remove any roles from anyone 🤷‍♂️`;
+
       const skippedMembersText = `-# (Skipped ${skippedMembers.length > 1 ? 'members' : 'member'} ${skippedMembers.joinReplaceLast(', ', 'and')} since I don't have enough permissions to change their roles 💁‍♂️🚧)`;
-      const replyText = `${removedMembersText}${skippedMembers.length ? `\n${skippedMembersText}` : ''}`;
+      const tooManySkippedMembersText = `-# (Skipped ${skippedMembers.length} members since I don't have enough permissions to change their roles 💁‍♂️🚧)`;
+      const skippedText = skippedMembers.length
+        ? skippedMembers.length >= 0
+          ? `\n${tooManySkippedMembersText}`
+          : `\n${skippedMembersText}`
+        : '';
+
+      const replyText = `${membersWithRemovedRoles.length === 0 ? noRolesRemovedText : removedRolesText}${skippedText}`;
 
       console.log(`\n${replyText}`);
       await interaction.followUp(replyText);
