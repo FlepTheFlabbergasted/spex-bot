@@ -1,0 +1,11 @@
+{
+  "name": "spex-bot",
+  "script": "npm",
+  "args": "run start",
+  "watch": true,
+  "ignore_watch": ["node_modules", "spex-bot-log.txt"],
+  "log_file": "spex-bot-log.txt",
+  "time": true,
+  "cron_restart": "0 0 1 */4 *",
+  "restart_delay": "3000"
+}
