@@ -146,7 +146,7 @@ async function removeRolesFromAllMembers(guildMemberCollection, interaction, sel
     }
 
     try {
-      console.log(`Removing roles form ${memberName}`);
+      console.log(`Removing roles from ${memberName}`);
       membersWithRemovedRoles.push(memberName);
       await member.roles.remove(selectedRoleIds);
     } catch (error) {
