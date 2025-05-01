@@ -2,7 +2,6 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ComponentType,
   InteractionContextType,
   PermissionFlagsBits,
   RoleSelectMenuBuilder,
@@ -40,73 +39,65 @@ export const COMMAND_YEET_ROLES = {
       .setPlaceholder('Select roles to remove from members')
       .setMinValues(1)
       .setMaxValues(roleCollection.size);
-    const actionRow = new ActionRowBuilder().setComponents(roleMenu);
+    const confirmBtn = new ButtonBuilder()
+      .setCustomId(`confirm-button${interaction.id}`)
+      .setLabel('Remove roles')
+      .setStyle(ButtonStyle.Danger);
+    const cancelBtn = new ButtonBuilder()
+      .setCustomId(`cancel-button${interaction.id}`)
+      .setLabel('Cancel')
+      .setStyle(ButtonStyle.Secondary);
 
-    const reply = await interaction.reply({ components: [actionRow] });
-
-    const collector = reply.createMessageComponentCollector({
-      componentType: ComponentType.RoleSelect,
-      filter: (i) => i.user.id === interaction.user.id && i.customId === roleMenu.toJSON().custom_id,
-      time: 120_000, // Keep collection response open for 2 minutes
-      max: 1, // Max 1 response
+    const reply = await interaction.reply({
+      components: [
+        new ActionRowBuilder().setComponents(roleMenu),
+        new ActionRowBuilder().setComponents(cancelBtn, confirmBtn),
+      ],
     });
 
-    collector.on('end', async (roleInteractionCollection) => {
-      const selectedRoleIds = roleInteractionCollection.first()?.values || [];
-      const selectedRoleNames = selectedRoleIds.map((roleId) => roleCollection.get(roleId)?.name);
-      const selectedRoleNamesStr = selectedRoleNames.map((r) => `*${r}*`).joinReplaceLast(', ', 'and');
+    const collector = reply.createMessageComponentCollector({
+      filter: (i) => i.user.id === interaction.user.id,
+      time: 120_000, // Keep collection response open for 2 minutes
+    });
 
-      if (selectedRoleNames.length === 0) {
-        const noSelectionStr = 'You did not select any roles in time, bye! 👋';
+    let selectedRoleIds = [];
 
-        console.log(`${noSelectionStr}\n`);
-        await reply.editReply({ content: noSelectionStr, components: [] });
+    collector.on('collect', async (componentInteraction) => {
+      if (componentInteraction.customId === roleMenu.toJSON().custom_id) {
+        console.log('rolemenu componentInteraction.values: ', componentInteraction.values);
+        selectedRoleIds = componentInteraction.values;
+        await componentInteraction.deferUpdate();
         return;
       }
 
-      const confirmBtn = new ButtonBuilder()
-        .setCustomId(`confirm-button${interaction.id}`)
-        .setLabel('Confirm Remove')
-        .setStyle(ButtonStyle.Danger);
-      const cancelBtn = new ButtonBuilder()
-        .setCustomId(`cancel-button${interaction.id}`)
-        .setLabel('Cancel')
-        .setStyle(ButtonStyle.Secondary);
-      const actionRow2 = new ActionRowBuilder().setComponents(cancelBtn, confirmBtn);
+      if (componentInteraction.customId === confirmBtn.toJSON().custom_id) {
+        console.log('confirm btn componentInteraction.values: ', componentInteraction.values);
+        console.log('confirm btn selectedRoleIds: ', selectedRoleIds);
+        const selectedRoleNames = selectedRoleIds.map((roleId) => roleCollection.get(roleId)?.name);
+        const selectedRoleNamesStr = selectedRoleNames.map((r) => `*${r}*`).joinReplaceLast(', ', 'and');
 
-      const selectionStr = `You selected ${selectedRoleNames.length > 1 ? 'roles' : 'role'} ${selectedRoleNamesStr} to be removed from members 🙋‍♂️🙋‍♀️\nGoing at it now... 🔪`;
+        console.log('selectedRoleNames: ', selectedRoleNames);
 
-      console.log(`${selectionStr}\n`);
-      const buttonResponse = await reply.editReply({
-        content: selectionStr,
-        components: [actionRow2],
-      });
+        const replyText = await removeRolesFromAllMembers(
+          guildMemberCollection,
+          interaction,
+          selectedRoleIds,
+          selectedRoleNamesStr
+        );
 
-      try {
-        const buttonInteraction = await buttonResponse.awaitMessageComponent({
-          componentType: ComponentType.Button,
-          filter: (i) => i.user.id === interaction.user.id,
-          time: 60_000,
-        });
+        console.log(`\n${replyText}`);
+        await componentInteraction.update({ content: replyText, components: [] });
+      } else if (componentInteraction.customId === cancelBtn.toJSON().custom_id) {
+        await componentInteraction.update({ content: 'Action cancelled', components: [] });
+      }
+    });
 
-        if (buttonInteraction.customId === confirmBtn.toJSON().custom_id) {
-          const replyText = await removeRolesFromAllMembers(
-            guildMemberCollection,
-            interaction,
-            selectedRoleIds,
-            selectedRoleNamesStr
-          );
+    collector.on('end', async (componentInteraction) => {
+      if (selectedRoleIds.length === 0) {
+        const noSelectionStr = `You didn't do anything for 2 minutes, bye! 👋`;
 
-          console.log(`\n${replyText}`);
-          await buttonInteraction.update({ content: replyText, components: [] });
-        } else if (buttonInteraction.customId === cancelBtn.toJSON().custom_id) {
-          await buttonInteraction.update({ content: 'Action cancelled', components: [] });
-        }
-      } catch {
-        const noChoiceStr = 'You did not make any choice in time, bye! 👋';
-
-        console.log(`${noChoiceStr}\n`);
-        await interaction.editReply({ content: noChoiceStr, components: [] });
+        console.log(`${noSelectionStr}\n`);
+        await componentInteraction.editReply({ content: noSelectionStr, components: [] });
         return;
       }
     });
@@ -122,18 +113,18 @@ async function removeRolesFromAllMembers(guildMemberCollection, interaction, sel
 
     // We do not touch the member who is using the command
     if (member.user.id === interaction.user.id) {
-      return;
+      break;
     }
 
     // Bots cannot remove other bots' roles
     if (member.user.bot) {
-      return;
+      break;
     }
 
     if (!member.moderatable) {
       console.log(`Not enough permissions to remove roles from ${memberName}, skipping`);
       skippedMembers.push(memberName);
-      return;
+      break;
     }
 
     try {
