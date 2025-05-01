@@ -34,28 +34,26 @@ export const COMMAND_YEET_ROLES = {
     const guildMemberCollection = await interaction.guild.members.fetch();
     const roleCollection = await interaction.guild.roles.fetch();
 
-    const roleMenu = new RoleSelectMenuBuilder()
+    const roleMenuBuilder = new RoleSelectMenuBuilder()
       .setCustomId(`role-menu-select${interaction.id}`)
       .setPlaceholder('Select roles to remove from members')
-      .setMinValues(1)
+      .setMinValues(0) // So we can disable the cfm button, but we really want atleast 1
       .setMaxValues(roleCollection.size);
-    const confirmBtn = new ButtonBuilder()
+    const confirmBtnBuilder = new ButtonBuilder()
       .setCustomId(`confirm-button${interaction.id}`)
       .setLabel('Remove roles')
-      .setStyle(ButtonStyle.Danger);
-    const cancelBtn = new ButtonBuilder()
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(true);
+    const cancelBtnBuilder = new ButtonBuilder()
       .setCustomId(`cancel-button${interaction.id}`)
       .setLabel('Cancel')
       .setStyle(ButtonStyle.Secondary);
+    const roleMenuRow = new ActionRowBuilder().setComponents(roleMenuBuilder);
+    const buttonsRow = new ActionRowBuilder().setComponents(cancelBtnBuilder, confirmBtnBuilder);
 
-    const reply = await interaction.reply({
-      components: [
-        new ActionRowBuilder().setComponents(roleMenu),
-        new ActionRowBuilder().setComponents(cancelBtn, confirmBtn),
-      ],
-    });
+    const interactionReply = await interaction.reply({ components: [roleMenuRow, buttonsRow] });
 
-    const collector = reply.createMessageComponentCollector({
+    const collector = interactionReply.createMessageComponentCollector({
       filter: (i) => i.user.id === interaction.user.id,
       time: 120_000, // Keep collection response open for 2 minutes
     });
@@ -63,20 +61,36 @@ export const COMMAND_YEET_ROLES = {
     let selectedRoleIds = [];
 
     collector.on('collect', async (componentInteraction) => {
-      if (componentInteraction.customId === roleMenu.toJSON().custom_id) {
-        console.log('rolemenu componentInteraction.values: ', componentInteraction.values);
-        selectedRoleIds = componentInteraction.values;
+      if (componentInteraction.customId === roleMenuBuilder.toJSON().custom_id) {
         await componentInteraction.deferUpdate();
-        return;
-      }
 
-      if (componentInteraction.customId === confirmBtn.toJSON().custom_id) {
-        console.log('confirm btn componentInteraction.values: ', componentInteraction.values);
-        console.log('confirm btn selectedRoleIds: ', selectedRoleIds);
+        const buttonActionRow = componentInteraction.message.components[1];
+        const confirmButton = buttonActionRow.components.find(
+          (c) => c.customId === confirmBtnBuilder.toJSON().custom_id
+        );
+
+        // We now have values and we didn't have values before
+        if (componentInteraction.values.length && !selectedRoleIds.length) {
+          await componentInteraction.message.edit({
+            components: [
+              roleMenuRow,
+              new ActionRowBuilder().setComponents(cancelBtnBuilder, confirmBtnBuilder.setDisabled(false)),
+            ],
+          });
+          // Confirm button is not yet disabled
+        } else if (!componentInteraction.values.length && !confirmButton.disabled) {
+          await componentInteraction.message.edit({
+            components: [
+              roleMenuRow,
+              new ActionRowBuilder().setComponents(cancelBtnBuilder, confirmBtnBuilder.setDisabled(true)),
+            ],
+          });
+        }
+
+        selectedRoleIds = componentInteraction.values;
+      } else if (componentInteraction.customId === confirmBtnBuilder.toJSON().custom_id) {
         const selectedRoleNames = selectedRoleIds.map((roleId) => roleCollection.get(roleId)?.name);
         const selectedRoleNamesStr = selectedRoleNames.map((r) => `*${r}*`).joinReplaceLast(', ', 'and');
-
-        console.log('selectedRoleNames: ', selectedRoleNames);
 
         const replyText = await removeRolesFromAllMembers(
           guildMemberCollection,
@@ -85,19 +99,21 @@ export const COMMAND_YEET_ROLES = {
           selectedRoleNamesStr
         );
 
-        console.log(`\n${replyText}`);
+        console.log(replyText);
         await componentInteraction.update({ content: replyText, components: [] });
-      } else if (componentInteraction.customId === cancelBtn.toJSON().custom_id) {
-        await componentInteraction.update({ content: 'Action cancelled', components: [] });
+      } else if (componentInteraction.customId === cancelBtnBuilder.toJSON().custom_id) {
+        console.log(`Action cancelled`);
+        await componentInteraction.update({ content: 'Role removal cancelled ❌', components: [] });
       }
     });
 
-    collector.on('end', async (componentInteraction) => {
+    collector.on('end', async () => {
       if (selectedRoleIds.length === 0) {
-        const noSelectionStr = `You didn't do anything for 2 minutes, bye! 👋`;
-
-        console.log(`${noSelectionStr}\n`);
-        await componentInteraction.editReply({ content: noSelectionStr, components: [] });
+        console.log(`Timeout, no response`);
+        await interaction.editReply({
+          content: `⌛ I didn't get a response within 2 minutes, bye! 👋`,
+          components: [],
+        });
         return;
       }
     });
@@ -107,6 +123,8 @@ export const COMMAND_YEET_ROLES = {
 async function removeRolesFromAllMembers(guildMemberCollection, interaction, selectedRoleIds, selectedRoleNamesStr) {
   let membersWithRemovedRoles = [];
   let skippedMembers = [];
+
+  console.log(`Selected roles to remove from members: ${selectedRoleNamesStr}`);
 
   for (const member of guildMemberCollection.values()) {
     const memberName = `*${member.displayName ?? member.user.username}*`;
@@ -128,7 +146,7 @@ async function removeRolesFromAllMembers(guildMemberCollection, interaction, sel
     }
 
     try {
-      console.log(`Removing role form ${memberName}`);
+      console.log(`Removing roles form ${memberName}`);
       membersWithRemovedRoles.push(memberName);
       await member.roles.remove(selectedRoleIds);
     } catch (error) {
@@ -136,7 +154,7 @@ async function removeRolesFromAllMembers(guildMemberCollection, interaction, sel
     }
   }
 
-  const removedRolesText = `Yeeted ${selectedRoleIds.length > 1 ? 'roles' : 'role'} ${selectedRoleNamesStr} from ${membersWithRemovedRoles.length} unsuspecting souls ✅`;
+  const removedRolesText = `Yeeted ${selectedRoleIds.length > 1 ? 'roles' : 'role'} ${selectedRoleNamesStr} from ${membersWithRemovedRoles.length} unsuspecting ${membersWithRemovedRoles.length > 1 ? 'souls' : 'soul'} ✅`;
   const noRolesRemovedText = `I didn't manage to remove any roles from anyone 🤷‍♂️`;
 
   const skippedMembersText = `-# (Skipped ${skippedMembers.length > 1 ? 'members' : 'member'} ${skippedMembers.joinReplaceLast(', ', 'and')} since I don't have enough permissions to change their roles 💁‍♂️🚧)`;
