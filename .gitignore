@@ -1,6 +1,4 @@
 node_modules
 .env
 config.json
-firebase-debug.log
-.gcloudignore
 spex-bot-log.txt
