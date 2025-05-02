@@ -18,9 +18,9 @@
     "node": "22"
   },
   "scripts": {
-    "start": "npx index.js",
-    "start-watch": "npx nodemon index.js",
-    "start-keepalive": "pm2 start ecosystem.config.json",
+    "start": "node index.js",
+    "start:watch": "npx nodemon index.js",
+    "start:keepalive": "pm2 start ecosystem.config.json",
     "register:dev": "cross-env GUILD_DEV_ID=369422543712550912 node commands/util/register-commands.js",
     "register:prod": "cross-env NODE_ENV=prod node commands/util/register-commands.js",
     "delete-all-commands": "cross-env GUILD_DEV_ID=369422543712550912 node commands/util/delete-all-commands.js"
