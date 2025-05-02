@@ -3,6 +3,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   InteractionContextType,
+  MessageFlags,
   PermissionFlagsBits,
   RoleSelectMenuBuilder,
   SlashCommandBuilder,
@@ -55,9 +56,10 @@ export const COMMAND_YEET_ROLES = {
 
     const collector = interactionReply.createMessageComponentCollector({
       filter: (i) => i.user.id === interaction.user.id,
-      time: 120_000, // Keep collection response open for 2 minutes
+      time: 120_000, // Keep collection response open for 2 minutes (in milliseconds)
     });
 
+    let actionCancelled = false;
     let selectedRoleIds = [];
 
     collector.on('collect', async (componentInteraction) => {
@@ -102,19 +104,31 @@ export const COMMAND_YEET_ROLES = {
         console.log(replyText);
         await componentInteraction.update({ content: replyText, components: [] });
       } else if (componentInteraction.customId === cancelBtnBuilder.toJSON().custom_id) {
-        console.log(`Action cancelled`);
-        await componentInteraction.update({ content: 'Role removal cancelled ❌', components: [] });
+        actionCancelled = true;
+        const cancelText = `Command ${COMMAND_NAME} cancelled by user ❌`;
+        console.log(cancelText);
+
+        await componentInteraction.deferUpdate();
+        await componentInteraction.deleteReply();
+        await componentInteraction.followUp({
+          content: cancelText,
+          components: [],
+          flags: MessageFlags.Ephemeral,
+        });
       }
     });
 
     collector.on('end', async () => {
-      if (selectedRoleIds.length === 0) {
-        console.log(`Timeout, no response`);
-        await interaction.editReply({
-          content: `⌛ I didn't get a response within 2 minutes, bye! 👋`,
+      if (!actionCancelled) {
+        const timeoutText = `⌛ I didn't get a response within 2 minutes, bye! 👋`;
+        console.log(timeoutText);
+
+        await interaction.deleteReply();
+        await interaction.followUp({
+          content: timeoutText,
           components: [],
+          flags: MessageFlags.Ephemeral,
         });
-        return;
       }
     });
   },
