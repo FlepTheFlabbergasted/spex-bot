@@ -13,6 +13,8 @@ import '../util/array.prototypes.js';
 const COMMAND_NAME = 'yeet-roles';
 const INTERACTION_RESPONSE_TIMEOUT_MS = 120_000; // 2 minutes
 
+let didUserCancelCommand = false;
+
 /**
  * Remember to drag thte bot role above all others you intend to remove
  * https://dev.to/terabytetiger/how-roles-cause-missing-permission-errors-in-discordjs-1ji7
@@ -50,31 +52,28 @@ export const COMMAND_YEET_ROLES = {
       time: INTERACTION_RESPONSE_TIMEOUT_MS, // Keep collection response open this long
     });
 
-    let didUserCancelCommand = false;
     let selectedRoleIds = [];
 
-    collector.on(
-      'collect',
-      async (componentInteraction) =>
-        (didUserCancelCommand = await collectorOnCollect(
-          commandInteraction,
-          componentInteraction,
-          roleMenuBuilder.toJSON().custom_id,
-          roleMenuRow,
-          cancelBtnBuilder,
-          confirmBtnBuilder,
-          selectedRoleIds,
-          roleCollection,
-          guildMemberCollection
-        ))
+    collector.on('collect', async (componentInteraction) =>
+      collectorOnCollect(
+        commandInteraction,
+        componentInteraction,
+        roleMenuBuilder.toJSON().custom_id,
+        roleMenuRow,
+        cancelBtnBuilder,
+        confirmBtnBuilder,
+        selectedRoleIds,
+        roleCollection,
+        guildMemberCollection
+      )
     );
 
-    collector.on('end', () => collectorOnEnd(commandInteraction, didUserCancelCommand));
+    collector.on('end', () => collectorOnEnd(commandInteraction));
   },
 };
 
-const collectorOnEnd = async (commandInteraction, didUserCancelCommand) => {
-  console.log(`#### collectorOnEnd, didUserCancelCommand: `, await didUserCancelCommand);
+const collectorOnEnd = async (commandInteraction) => {
+  console.log(`#### collectorOnEnd, didUserCancelCommand: `, didUserCancelCommand);
 
   if (!didUserCancelCommand) {
     const timeoutText = `⌛ I didn't get a response within 2 minutes, bye! 👋`;
@@ -151,7 +150,7 @@ const collectorOnCollect = async (
         flags: MessageFlags.Ephemeral,
       });
 
-      return true; //actionCancelled = true;
+      didUserCancelCommand = true;
     }
   }
 };
