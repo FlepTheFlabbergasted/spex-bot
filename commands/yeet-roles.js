@@ -29,102 +29,53 @@ export const COMMAND_YEET_ROLES = {
     .setContexts(InteractionContextType.Guild),
   /**
    *
-   * @param {import('discord.js').ChatInputCommandInteraction} interaction
+   * @param {import('discord.js').ChatInputCommandInteraction} commandInteraction
    */
-  execute: async (interaction) => {
-    const guildMemberCollection = await interaction.guild.members.fetch();
-    const roleCollection = await interaction.guild.roles.fetch();
+  execute: async (commandInteraction) => {
+    console.log(`######### NEW STUFF`);
+    const guildMemberCollection = await commandInteraction.guild.members.fetch();
+    const roleCollection = await commandInteraction.guild.roles.fetch();
 
-    const roleMenuBuilder = new RoleSelectMenuBuilder()
-      .setCustomId(`role-menu-select${interaction.id}`)
-      .setPlaceholder('Select roles to remove from members')
-      .setMinValues(0) // So we can disable the cfm button, but we really want atleast 1
-      .setMaxValues(roleCollection.size);
-    const confirmBtnBuilder = new ButtonBuilder()
-      .setCustomId(`confirm-button${interaction.id}`)
-      .setLabel('Remove roles')
-      .setStyle(ButtonStyle.Danger)
-      .setDisabled(true);
-    const cancelBtnBuilder = new ButtonBuilder()
-      .setCustomId(`cancel-button${interaction.id}`)
-      .setLabel('Cancel')
-      .setStyle(ButtonStyle.Secondary);
+    const { cancelBtnBuilder, confirmBtnBuilder } = getCancelAndConffirmButtons(commandInteraction.id);
+    const roleMenuBuilder = getRoleMenuBuilder(commandInteraction.id, roleCollection.size);
+
     const roleMenuRow = new ActionRowBuilder().setComponents(roleMenuBuilder);
     const buttonsRow = new ActionRowBuilder().setComponents(cancelBtnBuilder, confirmBtnBuilder);
 
-    const interactionReply = await interaction.reply({ components: [roleMenuRow, buttonsRow] });
+    const interactionReply = await commandInteraction.reply({ components: [roleMenuRow, buttonsRow] });
 
     const collector = interactionReply.createMessageComponentCollector({
-      filter: (i) => i.user.id === interaction.user.id,
+      filter: (i) => i.user.id === commandInteraction.user.id,
       time: 120_000, // Keep collection response open for 2 minutes (in milliseconds)
     });
 
     let actionCancelled = false;
     let selectedRoleIds = [];
 
-    collector.on('collect', async (componentInteraction) => {
-      if (componentInteraction.customId === roleMenuBuilder.toJSON().custom_id) {
-        await componentInteraction.deferUpdate();
-
-        const buttonActionRow = componentInteraction.message.components[1];
-        const confirmButton = buttonActionRow.components.find(
-          (c) => c.customId === confirmBtnBuilder.toJSON().custom_id
-        );
-
-        // We now have values and we didn't have values before
-        if (componentInteraction.values.length && !selectedRoleIds.length) {
-          await componentInteraction.message.edit({
-            components: [
-              roleMenuRow,
-              new ActionRowBuilder().setComponents(cancelBtnBuilder, confirmBtnBuilder.setDisabled(false)),
-            ],
-          });
-          // Confirm button is not yet disabled
-        } else if (!componentInteraction.values.length && !confirmButton.disabled) {
-          await componentInteraction.message.edit({
-            components: [
-              roleMenuRow,
-              new ActionRowBuilder().setComponents(cancelBtnBuilder, confirmBtnBuilder.setDisabled(true)),
-            ],
-          });
-        }
-
-        selectedRoleIds = componentInteraction.values;
-      } else if (componentInteraction.customId === confirmBtnBuilder.toJSON().custom_id) {
-        const selectedRoleNames = selectedRoleIds.map((roleId) => roleCollection.get(roleId)?.name);
-        const selectedRoleNamesStr = selectedRoleNames.map((r) => `*${r}*`).joinReplaceLast(', ', 'and');
-
-        const replyText = await removeRolesFromAllMembers(
-          guildMemberCollection,
-          interaction,
+    collector.on(
+      'collect',
+      async (componentInteraction) =>
+        (actionCancelled = collectorOnCollect(
+          commandInteraction,
+          componentInteraction,
+          roleMenuBuilder.toJSON().custom_id,
+          roleMenuRow,
+          cancelBtnBuilder,
+          confirmBtnBuilder,
           selectedRoleIds,
-          selectedRoleNamesStr
-        );
-
-        console.log(replyText);
-        await componentInteraction.update({ content: replyText, components: [] });
-      } else if (componentInteraction.customId === cancelBtnBuilder.toJSON().custom_id) {
-        actionCancelled = true;
-        const cancelText = `Command ${COMMAND_NAME} cancelled by user ❌`;
-        console.log(cancelText);
-
-        await componentInteraction.deferUpdate();
-        await componentInteraction.deleteReply();
-        await componentInteraction.followUp({
-          content: cancelText,
-          components: [],
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-    });
+          roleCollection,
+          guildMemberCollection
+        ))
+    );
 
     collector.on('end', async () => {
+      console.log(`end actionCancelled: `, actionCancelled);
       if (!actionCancelled) {
         const timeoutText = `⌛ I didn't get a response within 2 minutes, bye! 👋`;
         console.log(timeoutText);
 
-        await interaction.deleteReply();
-        await interaction.followUp({
+        await commandInteraction.deleteReply();
+        await commandInteraction.followUp({
           content: timeoutText,
           components: [],
           flags: MessageFlags.Ephemeral,
@@ -132,6 +83,95 @@ export const COMMAND_YEET_ROLES = {
       }
     });
   },
+};
+
+const collectorOnCollect = async (
+  commandInteraction,
+  componentInteraction,
+  roleMenuBuilderId,
+  roleMenuRow,
+  cancelBtnBuilder,
+  confirmBtnBuilder,
+  selectedRoleIds,
+  roleCollection,
+  guildMemberCollection
+) => {
+  {
+    if (componentInteraction.customId === roleMenuBuilderId) {
+      await componentInteraction.deferUpdate();
+
+      const buttonActionRow = componentInteraction.message.components[1];
+      const confirmButton = buttonActionRow.components.find((c) => c.customId === confirmBtnBuilder.toJSON().custom_id);
+
+      // We now have values and we didn't have values before
+      if (componentInteraction.values.length && !selectedRoleIds.length) {
+        await componentInteraction.message.edit({
+          components: [
+            roleMenuRow,
+            new ActionRowBuilder().setComponents(cancelBtnBuilder, confirmBtnBuilder.setDisabled(false)),
+          ],
+        });
+        // Confirm button is not yet disabled
+      } else if (!componentInteraction.values.length && !confirmButton.disabled) {
+        await componentInteraction.message.edit({
+          components: [
+            roleMenuRow,
+            new ActionRowBuilder().setComponents(cancelBtnBuilder, confirmBtnBuilder.setDisabled(true)),
+          ],
+        });
+      }
+
+      selectedRoleIds = componentInteraction.values;
+    } else if (componentInteraction.customId === confirmBtnBuilder.toJSON().custom_id) {
+      const selectedRoleNames = selectedRoleIds.map((roleId) => roleCollection.get(roleId)?.name);
+      const selectedRoleNamesStr = selectedRoleNames.map((r) => `*${r}*`).joinReplaceLast(', ', 'and');
+
+      const replyText = await removeRolesFromAllMembers(
+        guildMemberCollection,
+        commandInteraction,
+        selectedRoleIds,
+        selectedRoleNamesStr
+      );
+
+      console.log(replyText);
+      await componentInteraction.update({ content: replyText, components: [] });
+    } else if (componentInteraction.customId === cancelBtnBuilder.toJSON().custom_id) {
+      const cancelText = `Command ${COMMAND_NAME} cancelled by user ❌`;
+      console.log(cancelText);
+
+      await componentInteraction.deferUpdate();
+      await componentInteraction.deleteReply();
+      await componentInteraction.followUp({
+        content: cancelText,
+        components: [],
+        flags: MessageFlags.Ephemeral,
+      });
+
+      return true; //actionCancelled = true;
+    }
+  }
+};
+
+const getRoleMenuBuilder = (interactionId, nrOfRoles) => {
+  return new RoleSelectMenuBuilder()
+    .setCustomId(`role-menu-select${interactionId}`)
+    .setPlaceholder('Select roles to remove from members')
+    .setMinValues(0) // So we can disable the cfm button, but we really want atleast 1
+    .setMaxValues(nrOfRoles);
+};
+
+const getCancelAndConffirmButtons = (interactionId) => {
+  return {
+    cancelBtnBuilder: new ButtonBuilder()
+      .setCustomId(`cancel-button${interactionId}`)
+      .setLabel('Cancel')
+      .setStyle(ButtonStyle.Secondary),
+    confirmBtnBuilder: new ButtonBuilder()
+      .setCustomId(`confirm-button${interactionId}`)
+      .setLabel('Remove roles')
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(true),
+  };
 };
 
 async function removeRolesFromAllMembers(guildMemberCollection, interaction, selectedRoleIds, selectedRoleNamesStr) {

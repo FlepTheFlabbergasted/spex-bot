@@ -24,17 +24,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await command.execute(interaction);
   } catch (error) {
     console.error(error);
-    if (interaction.replied || interaction.deferred) {
-      return await interaction.followUp({
-        content: 'There was an error while executing this command!',
-        flags: MessageFlags.Ephemeral,
-      });
-    } else {
-      return await interaction.reply({
-        content: 'There was an error while executing this command!',
-        flags: MessageFlags.Ephemeral,
-      });
-    }
+
+    const followUpOrReplyData = {
+      content: 'There was an error while executing this command!',
+      flags: MessageFlags.Ephemeral,
+    };
+
+    return await (interaction.replied || interaction.deferred
+      ? interaction.followUp(followUpOrReplyData)
+      : interaction.reply(followUpOrReplyData));
   }
 });
 
