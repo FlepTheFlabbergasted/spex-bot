@@ -11,6 +11,7 @@ import {
 import '../util/array.prototypes.js';
 
 const COMMAND_NAME = 'yeet-roles';
+const INTERACTION_RESPONSE_TIMEOUT_MS = 120_000; // 2 minutes
 
 /**
  * Remember to drag thte bot role above all others you intend to remove
@@ -33,6 +34,7 @@ export const COMMAND_YEET_ROLES = {
    */
   execute: async (commandInteraction) => {
     console.log(`######### NEW STUFF`);
+
     const guildMemberCollection = await commandInteraction.guild.members.fetch();
     const roleCollection = await commandInteraction.guild.roles.fetch();
 
@@ -43,19 +45,18 @@ export const COMMAND_YEET_ROLES = {
     const buttonsRow = new ActionRowBuilder().setComponents(cancelBtnBuilder, confirmBtnBuilder);
 
     const interactionReply = await commandInteraction.reply({ components: [roleMenuRow, buttonsRow] });
-
     const collector = interactionReply.createMessageComponentCollector({
       filter: (i) => i.user.id === commandInteraction.user.id,
-      time: 120_000, // Keep collection response open for 2 minutes (in milliseconds)
+      time: INTERACTION_RESPONSE_TIMEOUT_MS, // Keep collection response open this long
     });
 
-    let actionCancelled = false;
+    let didUserCancelCommand = false;
     let selectedRoleIds = [];
 
     collector.on(
       'collect',
       async (componentInteraction) =>
-        (actionCancelled = collectorOnCollect(
+        (didUserCancelCommand = await collectorOnCollect(
           commandInteraction,
           componentInteraction,
           roleMenuBuilder.toJSON().custom_id,
@@ -68,21 +69,24 @@ export const COMMAND_YEET_ROLES = {
         ))
     );
 
-    collector.on('end', async () => {
-      console.log(`end actionCancelled: `, actionCancelled);
-      if (!actionCancelled) {
-        const timeoutText = `⌛ I didn't get a response within 2 minutes, bye! 👋`;
-        console.log(timeoutText);
-
-        await commandInteraction.deleteReply();
-        await commandInteraction.followUp({
-          content: timeoutText,
-          components: [],
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-    });
+    collector.on('end', () => collectorOnEnd(commandInteraction, didUserCancelCommand));
   },
+};
+
+const collectorOnEnd = async (commandInteraction, didUserCancelCommand) => {
+  console.log(`#### collectorOnEnd, didUserCancelCommand: `, await didUserCancelCommand);
+
+  if (!didUserCancelCommand) {
+    const timeoutText = `⌛ I didn't get a response within 2 minutes, bye! 👋`;
+    console.log(timeoutText);
+
+    await commandInteraction.deleteReply();
+    await commandInteraction.followUp({
+      content: timeoutText,
+      components: [],
+      flags: MessageFlags.Ephemeral,
+    });
+  }
 };
 
 const collectorOnCollect = async (
