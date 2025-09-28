@@ -5,8 +5,9 @@ import {
   InteractionContextType,
   MessageFlags,
   PermissionFlagsBits,
-  RoleSelectMenuBuilder,
   SlashCommandBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
 } from 'discord.js';
 import '../util/array.prototypes.js';
 
@@ -16,6 +17,10 @@ const INTERACTION_RESPONSE_TIMEOUT_MS = 120_000; // 2 minutes
 const NO_ROLES_TO_REMOVE_EVENT_NAME = 'noRolesToRemove';
 const NO_MEMBERS_LEFT_TO_MANAGE_EVENT_NAME = 'noMembersLeftToManage';
 const CANCELLED_BY_USER_EVENT_NAME = 'cancelledByUser';
+
+const STRING_SELECT_MENU_COMPONENT_ID = 'stringSelectMenuId';
+const CANCEL_BUTTON_COMPONENT_ID = 'cancelButtonId';
+const CONFIRM_BUTTON_COMPONENT_ID = 'confirmButtonId';
 
 /**
  * Remember to drag the bot role above all others you intend to remove
@@ -42,34 +47,31 @@ export const COMMAND_YEET_ROLES = {
    * @param {import('discord.js').ChatInputCommandInteraction} commandInteraction
    */
   execute: async (commandInteraction) => {
-    const state = { botMember: commandInteraction.guild.members.me, selectedRoleIds: [] };
+    const state = {
+      botMember: commandInteraction.guild.members.me,
+      selectedRoleIds: [],
+      guildMemberCollection: filterGuildMembers(
+        await commandInteraction.guild.members.fetch(),
+        commandInteraction.user.id
+      ),
+      availableRolesCollection: filterAndSortGuildRoles(await commandInteraction.guild.roles.fetch()),
+    };
 
-    const guildMemberCollection = filterGuildMembers(
-      await commandInteraction.guild.members.fetch(),
-      commandInteraction.user.id
-    );
-    const roleCollection = filterAndSortGuildRoles(await commandInteraction.guild.roles.fetch());
-
-    console.log(
-      `guildMemberCollection: `,
-      guildMemberCollection.map((m) => m.displayName)
-    );
-
-    if (roleCollection.size === 0) {
+    if (state.availableRolesCollection.size === 0) {
       await endCommand(commandInteraction, NO_ROLES_TO_REMOVE_EVENT_NAME);
       return;
-    } else if (guildMemberCollection.size === 0) {
+    } else if (state.guildMemberCollection.size === 0) {
       await endCommand(commandInteraction, NO_MEMBERS_LEFT_TO_MANAGE_EVENT_NAME);
       return;
     }
 
-    const { cancelBtnBuilder, confirmBtnBuilder } = getCancelAndConffirmButtons(commandInteraction.id);
-    const roleMenuBuilder = getRoleMenuBuilder(commandInteraction.id, roleCollection);
+    const interactionReply = await commandInteraction.reply({
+      components: [
+        getStringSelectActionRow(state.availableRolesCollection, state.selectedRoleIds),
+        getButtonsActionRow(true),
+      ],
+    });
 
-    const roleMenuRow = new ActionRowBuilder().setComponents(roleMenuBuilder);
-    const buttonsRow = new ActionRowBuilder().setComponents(cancelBtnBuilder, confirmBtnBuilder);
-
-    const interactionReply = await commandInteraction.reply({ components: [roleMenuRow, buttonsRow] });
     const collector = interactionReply.createMessageComponentCollector({
       // Only listen to the user that called the command
       filter: (i) => i.user.id === commandInteraction.user.id,
@@ -77,19 +79,7 @@ export const COMMAND_YEET_ROLES = {
       time: INTERACTION_RESPONSE_TIMEOUT_MS,
     });
 
-    collector.on('collect', async (componentInteraction) =>
-      collectorOnCollect(
-        collector,
-        componentInteraction,
-        roleMenuBuilder.toJSON().custom_id,
-        roleMenuRow,
-        cancelBtnBuilder,
-        confirmBtnBuilder,
-        state,
-        roleCollection,
-        guildMemberCollection
-      )
-    );
+    collector.on('collect', async (componentInteraction) => collectorOnCollect(collector, componentInteraction, state));
 
     collector.on('end', (_collected, reason) => endCommand(commandInteraction, reason));
   },
@@ -118,7 +108,7 @@ const endCommand = async (commandInteraction, reason) => {
 
       await commandInteraction.deleteReply();
       await commandInteraction.followUp({
-        content: `Command cancelled ❌`,
+        content: `Command cancelled by you 🛑`,
         components: [],
         flags: MessageFlags.Ephemeral,
       });
@@ -136,25 +126,20 @@ const endCommand = async (commandInteraction, reason) => {
   }
 };
 
-const collectorOnCollect = async (
-  collector,
-  componentInteraction,
-  roleMenuBuilderId,
-  roleMenuRow,
-  cancelBtnBuilder,
-  confirmBtnBuilder,
-  state,
-  roleCollection,
-  guildMemberCollection
-) => {
+const collectorOnCollect = async (collector, componentInteraction, state) => {
   switch (componentInteraction.customId) {
-    case roleMenuBuilderId:
-      await onRoleSelectBlur(componentInteraction, cancelBtnBuilder, confirmBtnBuilder, roleMenuRow, state);
+    case STRING_SELECT_MENU_COMPONENT_ID:
+      await onRoleSelectBlur(componentInteraction, state);
       break;
-    case confirmBtnBuilder.toJSON().custom_id:
-      await onConfirmBtnClick(componentInteraction, guildMemberCollection, roleCollection, state.selectedRoleIds);
+    case CONFIRM_BUTTON_COMPONENT_ID:
+      await onConfirmBtnClick(
+        componentInteraction,
+        state.guildMemberCollection,
+        state.availableRolesCollection,
+        state.selectedRoleIds
+      );
       break;
-    case cancelBtnBuilder.toJSON().custom_id:
+    case CANCEL_BUTTON_COMPONENT_ID:
       collector.stop(CANCELLED_BY_USER_EVENT_NAME);
       break;
     default:
@@ -163,31 +148,16 @@ const collectorOnCollect = async (
   }
 };
 
-const onRoleSelectBlur = async (componentInteraction, cancelBtnBuilder, confirmBtnBuilder, roleMenuRow, state) => {
-  const buttonActionRow = componentInteraction.message.components[1];
-  const confirmButton = buttonActionRow.components.find((c) => c.customId === confirmBtnBuilder.toJSON().custom_id);
+const onRoleSelectBlur = async (componentInteraction, state) => {
+  state.selectedRoleIds = componentInteraction.values;
 
   await componentInteraction.deferUpdate();
-
-  // We now have values and we didn't have values before, so enable the cfm button
-  if (componentInteraction.values.length && !state.selectedRoleIds.length) {
-    await componentInteraction.message.edit({
-      components: [
-        roleMenuRow,
-        new ActionRowBuilder().setComponents(cancelBtnBuilder, confirmBtnBuilder.setDisabled(false)),
-      ],
-    });
-    // Confirm button is not yet disabled
-  } else if (!componentInteraction.values.length && !confirmButton.disabled) {
-    await componentInteraction.message.edit({
-      components: [
-        roleMenuRow,
-        new ActionRowBuilder().setComponents(cancelBtnBuilder, confirmBtnBuilder.setDisabled(true)),
-      ],
-    });
-  }
-
-  state.selectedRoleIds = componentInteraction.values;
+  await componentInteraction.message.edit({
+    components: [
+      getStringSelectActionRow(state.availableRolesCollection, state.selectedRoleIds),
+      getButtonsActionRow(state.selectedRoleIds.length === 0),
+    ],
+  });
 };
 
 const onConfirmBtnClick = async (componentInteraction, guildMemberCollection, roleCollection, selectedRoleIds) => {
@@ -201,26 +171,36 @@ const onConfirmBtnClick = async (componentInteraction, guildMemberCollection, ro
   await componentInteraction.update({ content: replyText, components: [] });
 };
 
-const getRoleMenuBuilder = (interactionId, roleCollection) => {
-  return new RoleSelectMenuBuilder()
-    .setCustomId(`role-menu-select${interactionId}`)
-    .setPlaceholder('Select roles to remove from members')
-    .setMinValues(0) // So we can disable the cfm button, but we really want atleast 1
-    .setMaxValues(roleCollection.size);
-};
-
-const getCancelAndConffirmButtons = (interactionId) => {
-  return {
-    cancelBtnBuilder: new ButtonBuilder()
-      .setCustomId(`cancel-button${interactionId}`)
-      .setLabel('Cancel')
-      .setStyle(ButtonStyle.Secondary),
-    confirmBtnBuilder: new ButtonBuilder()
-      .setCustomId(`confirm-button${interactionId}`)
+const getButtonsActionRow = (shouldDisableCfmBtn) => {
+  return new ActionRowBuilder().setComponents(
+    new ButtonBuilder().setCustomId(CANCEL_BUTTON_COMPONENT_ID).setLabel('Cancel').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(CONFIRM_BUTTON_COMPONENT_ID)
       .setLabel('Remove roles')
       .setStyle(ButtonStyle.Danger)
-      .setDisabled(true),
-  };
+      .setDisabled(shouldDisableCfmBtn)
+  );
+};
+
+const getStringSelectActionRow = (roleCollection, selectedRoleIds) => {
+  return new ActionRowBuilder().setComponents(getStringSelectMenuBuilder(roleCollection, selectedRoleIds));
+};
+
+const getStringSelectMenuBuilder = (roleCollection, selectedRoleIds) => {
+  return new StringSelectMenuBuilder()
+    .setCustomId(STRING_SELECT_MENU_COMPONENT_ID)
+    .setPlaceholder('Select roles to remove from members')
+    .setMinValues(1) // So we can disable the cfm button, but we really want atleast 1
+    .setMaxValues(roleCollection.size)
+    .setOptions(
+      roleCollection.map((role) =>
+        new StringSelectMenuOptionBuilder()
+          .setLabel(role.name)
+          .setValue(role.id)
+          // Will keep already selected values on blur
+          .setDefault(selectedRoleIds.includes(role.id))
+      )
+    );
 };
 
 const filterGuildMembers = (guildMemberCollection, commandCallerUserId) => {
