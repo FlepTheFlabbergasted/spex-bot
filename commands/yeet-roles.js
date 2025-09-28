@@ -13,9 +13,9 @@ import '../util/array.prototypes.js';
 const COMMAND_NAME = 'yeet-roles';
 const INTERACTION_RESPONSE_TIMEOUT_MS = 120_000; // 2 minutes
 
-const COMMAND_CANCELLED_BY_USER_EVENT_NAME = 'cancelledByUser';
-const TIMEOUT_TEXT = `⌛ I didn't get a response within 2 minutes, bye! 👋`;
-const CANCEL_TEXT = `Command ${COMMAND_NAME} was cancelled by user ❌`;
+const NO_ROLES_TO_REMOVE_EVENT_NAME = 'noRolesToRemove';
+const NO_MEMBERS_LEFT_TO_MANAGE_EVENT_NAME = 'noMembersLeftToManage';
+const CANCELLED_BY_USER_EVENT_NAME = 'cancelledByUser';
 
 /**
  * Remember to drag the bot role above all others you intend to remove
@@ -50,6 +50,19 @@ export const COMMAND_YEET_ROLES = {
     );
     const roleCollection = filterAndSortGuildRoles(await commandInteraction.guild.roles.fetch());
 
+    console.log(
+      `guildMemberCollection: `,
+      guildMemberCollection.map((m) => m.displayName)
+    );
+
+    if (roleCollection.size === 0) {
+      await endCommand(commandInteraction, NO_ROLES_TO_REMOVE_EVENT_NAME);
+      return;
+    } else if (guildMemberCollection.size === 0) {
+      await endCommand(commandInteraction, NO_MEMBERS_LEFT_TO_MANAGE_EVENT_NAME);
+      return;
+    }
+
     const { cancelBtnBuilder, confirmBtnBuilder } = getCancelAndConffirmButtons(commandInteraction.id);
     const roleMenuBuilder = getRoleMenuBuilder(commandInteraction.id, roleCollection);
 
@@ -67,7 +80,6 @@ export const COMMAND_YEET_ROLES = {
     collector.on('collect', async (componentInteraction) =>
       collectorOnCollect(
         collector,
-        commandInteraction,
         componentInteraction,
         roleMenuBuilder.toJSON().custom_id,
         roleMenuRow,
@@ -79,26 +91,53 @@ export const COMMAND_YEET_ROLES = {
       )
     );
 
-    collector.on('end', (_collected, reason) => collectorOnEnd(commandInteraction, reason));
+    collector.on('end', (_collected, reason) => endCommand(commandInteraction, reason));
   },
 };
 
-const collectorOnEnd = async (commandInteraction, reason) => {
-  let followUpText = reason === COMMAND_CANCELLED_BY_USER_EVENT_NAME ? CANCEL_TEXT : TIMEOUT_TEXT;
+const endCommand = async (commandInteraction, reason) => {
+  switch (reason) {
+    case NO_MEMBERS_LEFT_TO_MANAGE_EVENT_NAME:
+      console.log(`Command cancelled, no members left to manage`);
 
-  console.log(followUpText);
+      await commandInteraction.reply({
+        content: `It looks like I have no members that I am allowed to remove roles from 🤷‍♂️ Remember to drag my role above the roles in the server you want me to be able to remove.`,
+        flags: MessageFlags.Ephemeral,
+      });
+      break;
+    case NO_ROLES_TO_REMOVE_EVENT_NAME:
+      console.log(`Command cancelled, bot has no roles it can manage`);
 
-  await commandInteraction.deleteReply();
-  await commandInteraction.followUp({
-    content: followUpText,
-    components: [],
-    flags: MessageFlags.Ephemeral,
-  });
+      await commandInteraction.reply({
+        content: `It looks like I have no roles that I can manage 🤷‍♂️ Remember to drag my role above the roles in the server you want me to be able to remove.`,
+        flags: MessageFlags.Ephemeral,
+      });
+      break;
+    case CANCELLED_BY_USER_EVENT_NAME:
+      console.log(`Command cancelled by user`);
+
+      await commandInteraction.deleteReply();
+      await commandInteraction.followUp({
+        content: `Command cancelled ❌`,
+        components: [],
+        flags: MessageFlags.Ephemeral,
+      });
+      break;
+    default:
+      console.log(`Command timed out (${INTERACTION_RESPONSE_TIMEOUT_MS / 60000} min)`);
+
+      await commandInteraction.deleteReply();
+      await commandInteraction.followUp({
+        content: `⌛ I didn't get a response within ${INTERACTION_RESPONSE_TIMEOUT_MS / 60000} minutes minutes, bye! 👋`,
+        components: [],
+        flags: MessageFlags.Ephemeral,
+      });
+      break;
+  }
 };
 
 const collectorOnCollect = async (
   collector,
-  commandInteraction,
   componentInteraction,
   roleMenuBuilderId,
   roleMenuRow,
@@ -113,16 +152,10 @@ const collectorOnCollect = async (
       await onRoleSelectBlur(componentInteraction, cancelBtnBuilder, confirmBtnBuilder, roleMenuRow, state);
       break;
     case confirmBtnBuilder.toJSON().custom_id:
-      await onConfirmBtnClick(
-        commandInteraction,
-        componentInteraction,
-        guildMemberCollection,
-        roleCollection,
-        state.selectedRoleIds
-      );
+      await onConfirmBtnClick(componentInteraction, guildMemberCollection, roleCollection, state.selectedRoleIds);
       break;
     case cancelBtnBuilder.toJSON().custom_id:
-      collector.stop(COMMAND_CANCELLED_BY_USER_EVENT_NAME);
+      collector.stop(CANCELLED_BY_USER_EVENT_NAME);
       break;
     default:
       console.error(`Unhandled component interaction with id "${componentInteraction.customId}"`);
@@ -157,26 +190,14 @@ const onRoleSelectBlur = async (componentInteraction, cancelBtnBuilder, confirmB
   state.selectedRoleIds = componentInteraction.values;
 };
 
-const onConfirmBtnClick = async (
-  commandInteraction,
-  componentInteraction,
-  guildMemberCollection,
-  roleCollection,
-  selectedRoleIds
-) => {
+const onConfirmBtnClick = async (componentInteraction, guildMemberCollection, roleCollection, selectedRoleIds) => {
   const roleCollectionRemovedManagedRoles = roleCollection.filter((role) => !role.managed);
   selectedRoleIds = selectedRoleIds.filter((roleId) => roleCollectionRemovedManagedRoles.get(roleId));
   const selectedRoleNames = selectedRoleIds.map((roleId) => roleCollectionRemovedManagedRoles.get(roleId)?.name);
   const selectedRoleNamesStr = selectedRoleNames.map((r) => `*${r}*`).joinReplaceLast(', ', 'and');
 
-  const replyText = await removeRolesFromAllMembers(
-    guildMemberCollection,
-    commandInteraction,
-    selectedRoleIds,
-    selectedRoleNamesStr
-  );
+  const replyText = await removeRolesFromAllMembers(guildMemberCollection, selectedRoleIds, selectedRoleNamesStr);
 
-  console.log(replyText);
   await componentInteraction.update({ content: replyText, components: [] });
 };
 
@@ -208,23 +229,25 @@ const filterGuildMembers = (guildMemberCollection, commandCallerUserId) => {
   const filteredMemberCollection = guildMemberCollection.filter((member) => {
     // We do not touch the member who is using the command
     if (member.user.id === commandCallerUserId) {
-      filteredMemberNamesAndReason.push({ name: member.displayName, reason: 'Command caller' });
+      filteredMemberNamesAndReason.push({ displayName: member.displayName, reason: 'Command caller' });
       return false;
     }
 
     // Bots cannot remove other bots' roles
     if (member.user.bot) {
-      filteredMemberNamesAndReason.push({ name: member.displayName, reason: 'Bot' });
+      filteredMemberNamesAndReason.push({ displayName: member.displayName, reason: 'Bot' });
       return false;
     }
 
     if (!member.moderatable) {
-      filteredMemberNamesAndReason.push({ name: member.displayName, reason: 'Not moderatable' });
+      filteredMemberNamesAndReason.push({ displayName: member.displayName, reason: 'Not moderatable' });
       return false;
     }
+
+    return true;
   });
 
-  console.log(`========= Filtered members =========`);
+  console.log(`========= Members removed by filter =========`);
   console.table(filteredMemberNamesAndReason);
 
   return filteredMemberCollection;
@@ -258,39 +281,30 @@ const filterAndSortGuildRoles = (roleCollection) => {
     roleA.name.localeCompare(roleB.name)
   );
 
-  console.log(`========= Filtered roles =========`);
+  console.log(`========= Roles removed by filter =========`);
   console.table(filteredRoleNamesAndReason);
 
   return filteredAndSortedRoleCollection;
 };
 
-async function removeRolesFromAllMembers(guildMemberCollection, interaction, selectedRoleIds, selectedRoleNamesStr) {
-  let membersWithRemovedRoles = [];
-
-  console.log(`Selected roles to remove from members: ${selectedRoleNamesStr}`);
+const removeRolesFromAllMembers = async (guildMemberCollection, selectedRoleIds, selectedRoleNamesStr) => {
+  let membersRolesRemovalResults = [];
 
   for (const member of guildMemberCollection.values()) {
-    const memberName = `*${member.displayName ?? member.user.username}*`;
-
     try {
-      console.log(`Removing roles from ${memberName}`);
-      membersWithRemovedRoles.push(memberName);
+      membersRolesRemovalResults.push({ displayName: member.displayName, result: 'Success' });
       await member.roles.remove(selectedRoleIds);
     } catch (error) {
-      console.log(error);
+      membersRolesRemovalResults.push({ displayName: member.displayName, result: 'Failure' });
+      console.log(`ERROR when removing ${member.displayName} roles`, error);
     }
   }
 
-  const removedRolesText = `Yeeted ${selectedRoleIds.length > 1 ? 'roles' : 'role'} ${selectedRoleNamesStr} from ${membersWithRemovedRoles.length} unsuspecting ${membersWithRemovedRoles.length > 1 ? 'souls' : 'soul'} ✅`;
+  console.log(`========= Member roles removal results =========`);
+  console.table(membersRolesRemovalResults);
+
+  const removedRolesText = `Yeeted ${selectedRoleIds.length > 1 ? 'roles' : 'role'} ${selectedRoleNamesStr} from ${membersRolesRemovalResults.length} unsuspecting ${membersRolesRemovalResults.length > 1 ? 'souls' : 'soul'} ✅`;
   const noRolesRemovedText = `I didn't manage to remove any roles from anyone 🤷‍♂️`;
 
-  // const skippedMembersText = `-# (Skipped ${skippedMembers.length > 1 ? 'members' : 'member'} ${skippedMembers.joinReplaceLast(', ', 'and')} since I don't have enough permissions to change their roles 💁‍♂️🚧)`;
-  // const tooManySkippedMembersText = `-# (Skipped ${skippedMembers.length} members since I don't have enough permissions to change their roles 💁‍♂️🚧)`;
-  // const skippedText = skippedMembers.length
-  //   ? skippedMembers.length >= 0
-  //     ? `\n${tooManySkippedMembersText}`
-  //     : `\n${skippedMembersText}`
-  //   : '';
-
-  return `${membersWithRemovedRoles.length === 0 ? noRolesRemovedText : removedRolesText}`;
-}
+  return membersRolesRemovalResults.length === 0 ? noRolesRemovedText : removedRolesText;
+};
