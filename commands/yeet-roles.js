@@ -42,8 +42,8 @@ const MAX_ROLES_PER_PAGE = 25;
  * https://pm2.keymetrics.io/docs/usage/quick-start/
  *
  * Reminder to self:
- * Start with pm2 on PI
- * To update, run locally, shut of other instances on the PI
+ * Start with pm2 to keepalive
+ * To update, run locally, shut of other instances
  * use `npm run start:watch` to test
  *
  */
