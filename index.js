@@ -20,7 +20,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   try {
-    console.log(`\n### ${interaction.member.displayName} called command "${interaction.commandName}"`);
+    console.log(
+      `\n=== User ${interaction.member.displayName} (${interaction.member.id}) called command ${interaction.commandName} ===`
+    );
     await command.execute(interaction);
   } catch (error) {
     console.error(error);
