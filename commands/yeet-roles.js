@@ -27,6 +27,14 @@ const NEXT_PAGE_BUTTON_ID = 'nextPage';
 
 const MAX_ROLES_PER_PAGE = 25;
 
+const ROLE_REMOVAL_SUCCESSFUL_RESULT = 'Success';
+
+// enum RolesRemovalResults = {
+//   Success = 'Success',
+//   NoMatchingRoles = 'No matching roles',
+//   Failure = 'Failure',
+// }
+
 /**
  * Remember to drag the bot role above all others you intend to remove
  * https://dev.to/terabytetiger/how-roles-cause-missing-permission-errors-in-discordjs-1ji7
@@ -149,25 +157,26 @@ const getPaginatedComponentsArr = (state) => {
 };
 
 const getRoleRemovalSuccessText = (state) => {
-  const selectedRoleIds = getSelectedRoleIds(state.selectedRoleIdsByPage);
-  const selectedRoleNamesStr = selectedRoleIds
-    .map((id) => state.availableRolesCollection.get(id)?.name)
-    .filter(Boolean);
+  const selectedRoleNamesStr = getSelectedRoleNames(state)
+    .map((roleName) => `*${roleName}*`)
+    .joinReplaceLast(', ', 'and');
 
-  const removedRolesText = `Yeeted role(s) ${selectedRoleNamesStr} from ${state.membersRolesRemovalResults.length} unsuspecting soul(s) ✅`;
-  const noRolesRemovedText = `I didn't manage to remove any roles from anyone 🤷‍♂️`;
+  const successfulRoleRemovalResults = state.membersRolesRemovalResults.filter(
+    (row) => row.result === ROLE_REMOVAL_SUCCESSFUL_RESULT
+  );
 
-  return state.membersRolesRemovalResults.length === 0 ? noRolesRemovedText : removedRolesText;
+  const removedRolesText = `Removed role(s) ${selectedRoleNamesStr} from ${successfulRoleRemovalResults.length} member(s)! ✅`;
+  const noRolesRemovedText = `I didn't manage to remove the role(s) ${selectedRoleNamesStr} from anyone 🤷‍♂️ Either no one currently has those roles or something blew up when I tried to remove them.`;
+
+  return successfulRoleRemovalResults.length === 0 ? noRolesRemovedText : removedRolesText;
 };
 
 const getCurrentRoleSelectionText = (state) => {
-  const selectedNames = getSelectedRoleIds(state.selectedRoleIdsByPage)
-    .map((id) => state.availableRolesCollection.get(id)?.name)
-    .filter(Boolean)
-    .sort((roleNameA, roleNameB) => roleNameA.localeCompare(roleNameB));
+  const selectedRoleIds = getSelectedRoleIds(state.selectedRoleIdsByPage);
+  const selectedRoleNamesStr = getSelectedRoleNames(state).join(', ');
 
-  return selectedNames.length > 0
-    ? `**Selected roles (${selectedNames.length}):**\n${selectedNames.join(', ')}`
+  return selectedRoleIds.length > 0
+    ? `**Selected roles (${selectedRoleIds.length}):**\n${selectedRoleNamesStr}`
     : `No roles selected yet.`;
 };
 
@@ -285,8 +294,15 @@ const removeRolesFromAllMembers = async (state) => {
 
   for (const member of state.guildMemberCollection.values()) {
     try {
-      state.membersRolesRemovalResults.push({ displayName: member.displayName, result: 'Success' });
-      await member.roles.remove(selectedRoleIds);
+      if (member.roles.cache.some((role) => selectedRoleIds.includes(role.id))) {
+        await member.roles.remove(selectedRoleIds);
+        state.membersRolesRemovalResults.push({
+          displayName: member.displayName,
+          result: ROLE_REMOVAL_SUCCESSFUL_RESULT,
+        });
+      } else {
+        state.membersRolesRemovalResults.push({ displayName: member.displayName, result: 'No matching roles' });
+      }
     } catch (error) {
       state.membersRolesRemovalResults.push({ displayName: member.displayName, result: 'Failure', error });
     }
@@ -298,6 +314,13 @@ const removeRolesFromAllMembers = async (state) => {
 
 const getSelectedRoleIds = (selectedRoleIdsByPage) => {
   return selectedRoleIdsByPage.flatMap((id) => id);
+};
+
+const getSelectedRoleNames = (state) => {
+  return getSelectedRoleIds(state.selectedRoleIdsByPage)
+    .map((id) => state.availableRolesCollection.get(id)?.name)
+    .filter(Boolean)
+    .sort((roleNameA, roleNameB) => roleNameA.localeCompare(roleNameB));
 };
 
 const endCommand = async (commandInteraction, reason) => {
