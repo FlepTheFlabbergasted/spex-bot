@@ -46,6 +46,9 @@ const INTERACTION_RESPONSE_TIMEOUT_MS = 120_000; // 2 minutes
  *
  * Reminder to self:
  * Start with pm2 to keepalive
+ * `pm2 start/stop spex-bot`
+ * `pm2 logs`
+ *
  * To update, run locally, shut of other instances
  * use `npm run start:watch` to test
  *
