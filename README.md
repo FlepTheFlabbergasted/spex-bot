@@ -6,7 +6,7 @@ Discord bot for Umespexarna
 
 ### yeet-roles
 
-Removes the roles you select from all members (excluding yourself and bots). It displays a select menu which contains the names of roles the bot can remove together with two buttons, "Cancel" and "Remove roles".
+Removes the roles you select from all members (excluding yourself and bots). May only be run by an Admin. It displays a select menu which contains the names of roles the bot can remove together with action- and pagintion buttons.
 
 ### mästersmith
 

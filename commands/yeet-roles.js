@@ -12,27 +12,30 @@ import {
 import '../util/array.prototypes.js';
 
 const COMMAND_NAME = 'yeet-roles';
-const INTERACTION_RESPONSE_TIMEOUT_MS = 120_000; // 2 minutes
 
-const NO_ROLES_TO_REMOVE_EVENT_NAME = 'noRolesToRemove';
+// Event names
+const NO_ROLES_LEFT_TO_MANAGE_EVENT_NAME = 'noRolesLeftToManage';
 const NO_MEMBERS_LEFT_TO_MANAGE_EVENT_NAME = 'noMembersLeftToManage';
 const CANCELLED_BY_USER_EVENT_NAME = 'cancelledByUser';
-
-const ROLE_REMOVAL_SUCCESSFUL_RESULT = 'Success';
-const ROLE_REMOVAL_NO_MATCHING_ROLES_RESULT = 'No matching roles';
-const ROLE_REMOVAL_FAILURE_RESULT = 'Failure';
-
 const ROLE_REMOVAL_SUCCESS_EVENT_NAME = 'roleRemovalSuccess';
 const ROLE_REMOVAL_NO_MEMBERS_WITH_ROLES_EVENT_NAME = 'roleRemovalNoMembersWithRoles';
 const ROLE_REMOVAL_FAILURE_EVENT_NAME = 'roleRemovalFailure';
 
+// Role removal result names
+const ROLE_REMOVAL_SUCCESSFUL_RESULT = 'Success';
+const ROLE_REMOVAL_NO_MATCHING_ROLES_RESULT = 'No matching roles';
+const ROLE_REMOVAL_FAILURE_RESULT = 'Failure';
+
+// Component IDs
 const STRING_SELECT_MENU_COMPONENT_ID = 'stringSelectMenuId';
 const CANCEL_BUTTON_COMPONENT_ID = 'cancelButtonId';
 const CONFIRM_BUTTON_COMPONENT_ID = 'confirmButtonId';
 const PREV_PAGE_BUTTON_ID = 'prevPage';
 const NEXT_PAGE_BUTTON_ID = 'nextPage';
 
+// Settings
 const MAX_ROLES_PER_PAGE = 25;
+const INTERACTION_RESPONSE_TIMEOUT_MS = 120_000; // 2 minutes
 
 /**
  * Remember to drag the bot role above all others you intend to remove
@@ -75,7 +78,7 @@ export const COMMAND_YEET_ROLES = {
     state.totalRoleSelectPages = Math.ceil(state.availableRolesCollection.size / MAX_ROLES_PER_PAGE);
 
     if (state.availableRolesCollection.size === 0) {
-      await endCommand(commandInteraction, state, NO_ROLES_TO_REMOVE_EVENT_NAME);
+      await endCommand(commandInteraction, state, NO_ROLES_LEFT_TO_MANAGE_EVENT_NAME);
       return;
     } else if (state.guildMemberCollection.size === 0) {
       await endCommand(commandInteraction, state, NO_MEMBERS_LEFT_TO_MANAGE_EVENT_NAME);
@@ -84,6 +87,7 @@ export const COMMAND_YEET_ROLES = {
 
     const interactionReply = await commandInteraction.reply({
       components: getPaginatedComponentsArr(state),
+      flags: MessageFlags.Ephemeral,
     });
 
     const collector = interactionReply.createMessageComponentCollector({
@@ -104,8 +108,7 @@ const collectorOnCollect = async (collector, componentInteraction, state) => {
     case STRING_SELECT_MENU_COMPONENT_ID: {
       state.selectedRoleIdsByPage[state.currentRoleSelectPage] = componentInteraction.values;
 
-      await componentInteraction.deferUpdate();
-      await componentInteraction.message.edit({
+      await componentInteraction.update({
         content: getCurrentRoleSelectionText(state),
         components: getPaginatedComponentsArr(state),
       });
@@ -121,10 +124,6 @@ const collectorOnCollect = async (collector, componentInteraction, state) => {
       );
 
       if (successfulRoleRemovalRows.length) {
-        await componentInteraction.update({
-          content: getRoleRemovalSuccessText(state),
-          components: [],
-        });
         collector.stop(ROLE_REMOVAL_SUCCESS_EVENT_NAME);
       } else if (noMatchingRolesRoleRemovalRows.length === state.membersRolesRemovalRows.length) {
         collector.stop(ROLE_REMOVAL_NO_MEMBERS_WITH_ROLES_EVENT_NAME);
@@ -170,27 +169,12 @@ const getPaginatedComponentsArr = (state) => {
   ];
 };
 
-const getRoleRemovalSuccessText = (state) => {
-  const selectedRoleNamesStr = getSelectedRoleNames(state)
-    .map((roleName) => `*${roleName}*`)
-    .joinReplaceLast(', ', 'and');
-
-  const successfulRoleRemovalResults = state.membersRolesRemovalRows.filter(
-    (row) => row.result === ROLE_REMOVAL_SUCCESSFUL_RESULT
-  );
-
-  const removedRolesText = `Removed role(s) ${selectedRoleNamesStr} from ${successfulRoleRemovalResults.length} member(s)! ✅`;
-  const noRolesRemovedText = `I didn't manage to remove the role(s) ${selectedRoleNamesStr} from anyone 🤷‍♂️ Either no one currently has those roles or something blew up when I tried to remove them 💥`;
-
-  return successfulRoleRemovalResults.length === 0 ? noRolesRemovedText : removedRolesText;
-};
-
 const getCurrentRoleSelectionText = (state) => {
   const selectedRoleIds = getSelectedRoleIds(state.selectedRoleIdsByPage);
   const selectedRoleNamesStr = getSelectedRoleNames(state).join(', ');
 
   return selectedRoleIds.length > 0
-    ? `**Selected roles (${selectedRoleIds.length}):**\n${selectedRoleNamesStr}`
+    ? `### Selected roles (${selectedRoleIds.length}):\n${selectedRoleNamesStr}\n\u200B`
     : `No roles selected yet.`;
 };
 
@@ -274,7 +258,7 @@ const filterAndSortGuildRoles = (roleCollection) => {
 
   const filteredRoleCollection = roleCollection.filter((role) => {
     if (role.name === '@everyone') {
-      filteredRoleNamesAndReason.push({ name: role.name, reason: 'You know why' });
+      filteredRoleNamesAndReason.push({ name: role.name, reason: 'Not allowed' });
       return false;
     }
 
@@ -345,36 +329,39 @@ const getSelectedRoleNames = (state) => {
 };
 
 const endCommand = async (commandInteraction, state, reason) => {
-  const selectedRoleNamesStr = getSelectedRoleNames(state).map((roleName) => `*${roleName}*`);
+  const selectedRoleNames = getSelectedRoleNames(state);
+  const selectedRoleNamesStr = selectedRoleNames.map((roleName) => `*${roleName}*`);
+  const plural = selectedRoleNames.length > 1;
+  const roleWord = plural ? 'roles' : 'role';
+  const memberWord = plural ? 'members' : 'member';
   const successfulRoleRemovalRows = state.membersRolesRemovalRows.filter(
     (row) => row.result === ROLE_REMOVAL_SUCCESSFUL_RESULT
   );
+  const reorderRolesReminderText = `Remember to drag my role above the roles in the server you want me to be able to remove from members.`;
 
   switch (reason) {
     case NO_MEMBERS_LEFT_TO_MANAGE_EVENT_NAME:
       console.log(`Command cancelled, no members left to manage`);
 
       await commandInteraction.reply({
-        content: `It looks like I have no members that I am allowed to remove roles from 🤷‍♂️ Remember to drag my role above the roles in the server you want me to be able to remove.`,
+        content: `It looks like I have no members that I am allowed to remove roles from 🤷‍♂️ ${reorderRolesReminderText}`,
         flags: MessageFlags.Ephemeral,
       });
       break;
-    case NO_ROLES_TO_REMOVE_EVENT_NAME:
+    case NO_ROLES_LEFT_TO_MANAGE_EVENT_NAME:
       console.log(`Command cancelled, bot has no roles it can manage`);
 
       await commandInteraction.reply({
-        content: `It looks like I have no roles that I can manage 🤷‍♂️ Remember to drag my role above the roles in the server you want me to be able to remove.`,
+        content: `It looks like I have no roles that I can manage 🤷‍♂️ ${reorderRolesReminderText}`,
         flags: MessageFlags.Ephemeral,
       });
       break;
     case CANCELLED_BY_USER_EVENT_NAME:
       console.log(`Command cancelled by user`);
 
-      await commandInteraction.deleteReply();
-      await commandInteraction.followUp({
-        content: `Command ${COMMAND_NAME} cancelled by you 🛑`,
+      await commandInteraction.editReply({
+        content: `Command cancelled by you 🛑`,
         components: [],
-        flags: MessageFlags.Ephemeral,
       });
       break;
     case ROLE_REMOVAL_NO_MEMBERS_WITH_ROLES_EVENT_NAME:
@@ -382,36 +369,34 @@ const endCommand = async (commandInteraction, state, reason) => {
         `Command completed ambiguously, no members had the selected roles: ${selectedRoleNamesStr.joinReplaceLast(', ', 'or')}`
       );
 
-      await commandInteraction.deleteReply();
-      await commandInteraction.followUp({
-        content: `I didn't manage to remove the role(s) ${selectedRoleNamesStr.joinReplaceLast(', ', 'and')} from anyone since no one currently has those roles 🤷‍♂️`,
+      await commandInteraction.editReply({
+        content: `I didn't manage to remove the ${roleWord} ${selectedRoleNamesStr.joinReplaceLast(', ', 'and')} from anyone since no one currently has the ${roleWord} 🤷‍♂️`,
         components: [],
-        flags: MessageFlags.Ephemeral,
       });
       break;
     case ROLE_REMOVAL_FAILURE_EVENT_NAME:
       console.log(`Command completed unsuccessfully, all role removals ended in failure`);
 
-      await commandInteraction.deleteReply();
-      await commandInteraction.followUp({
-        content: `I didn't manage to remove the role(s) ${selectedRoleNamesStr.joinReplaceLast(', ', 'and')} from anyone, every time I tried, something went wrong 💥 Contact your local free-range bot developer for more hopefully more information.`,
+      await commandInteraction.editReply({
+        content: `I didn't manage to remove the ${roleWord} ${selectedRoleNamesStr.joinReplaceLast(', ', 'and')} from anyone, every time I tried, something went wrong 💥 Contact your local free-range bot developer for more hopefully more information.`,
         components: [],
-        flags: MessageFlags.Ephemeral,
       });
       break;
     case ROLE_REMOVAL_SUCCESS_EVENT_NAME:
       console.log(
-        `Command completed successfully, removed role(s) ${selectedRoleNamesStr.joinReplaceLast(', ', 'and')} from ${successfulRoleRemovalRows.length} member(s)`
+        `Command completed successfully, removed ${roleWord} ${selectedRoleNamesStr.joinReplaceLast(', ', 'and')} from ${successfulRoleRemovalRows.length} ${memberWord}`
       );
+      await commandInteraction.editReply({
+        content: `Removed ${roleWord} ${selectedRoleNamesStr} from ${successfulRoleRemovalRows.length} ${memberWord}! ✅`,
+        components: [],
+      });
       break;
     default:
       console.log(`Command timed out (${INTERACTION_RESPONSE_TIMEOUT_MS / 60000} min)`);
 
-      await commandInteraction.deleteReply();
-      await commandInteraction.followUp({
+      await commandInteraction.editReply({
         content: `⌛ I didn't get a response within ${INTERACTION_RESPONSE_TIMEOUT_MS / 60000} minutes minutes, bye! 👋`,
         components: [],
-        flags: MessageFlags.Ephemeral,
       });
       break;
   }
