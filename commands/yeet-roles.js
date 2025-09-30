@@ -370,7 +370,7 @@ const endCommand = async (commandInteraction, state, reason) => {
       );
 
       await commandInteraction.editReply({
-        content: `I didn't manage to remove the ${roleWord} ${selectedRoleNamesStr.joinReplaceLast(', ', 'and')} from anyone since no one currently has the ${roleWord} 🤷‍♂️`,
+        content: `I didn't manage to remove the ${roleWord} ${selectedRoleNamesStr.joinReplaceLast(', ', 'and')} from anyone since no one currently has ${plural ? 'those' : 'that'} ${roleWord} 🤷‍♂️`,
         components: [],
       });
       break;
