@@ -44,14 +44,12 @@ const INTERACTION_RESPONSE_TIMEOUT_MS = 120_000; // 2 minutes
  * Keepalive
  * https://pm2.keymetrics.io/docs/usage/quick-start/
  *
- * Reminder to self:
- * Start with pm2 to keepalive
- * `pm2 start/stop spex-bot`
+ * === Reminder to self ===
+ * `pm2 ls`
  * `pm2 logs`
+ * `pm2 start/stop spex-bot`
  *
- * To update, run locally, shut of other instances
- * use `npm run start:watch` to test
- *
+ * To test and update, shut of other instances, and then run locally with `npm run start:watch`
  */
 export const COMMAND_YEET_ROLES = {
   name: COMMAND_NAME,
